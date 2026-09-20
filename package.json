@@ -1,6 +1,7 @@
 {
   "name": "mitorek",
   "type": "module",
+  "packageManager": "npm@11.19.0",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
