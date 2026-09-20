@@ -1,12 +1,19 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "mitorek",
-	"main": "src/index.ts",
 	"compatibility_date": "2026-08-22",
+	"d1_databases": [
+		{
+			"binding": "mitorek_db",
+			"database_id": "db173b9f-a793-4da8-8b91-d32d41d6ed3d",
+			"database_name": "mitorek"
+		}
+	],
+	"main": "src/index.ts",
+	"name": "mitorek",
 	"r2_buckets": [
 		{
-			"bucket_name": "mitorek-images",
-			"binding": "mitorek_images"
+			"binding": "mitorek_images",
+			"bucket_name": "mitorek-images"
 		}
 	]
 	// "compatibility_flags": [

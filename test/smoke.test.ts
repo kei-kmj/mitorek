@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import app from "../src/index";
+import app from "../src/index.ts";
 
 describe("smoke", () => {
 	it("1 + 1 = 2", () => {

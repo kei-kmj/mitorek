@@ -34,3 +34,6 @@ lerna-debug.log*
 .idea
 .node-version
 
+
+# generated
+worker-configuration.d.ts

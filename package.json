@@ -8,6 +8,7 @@
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
+    "lint:ci": "biome ci .",
     "test": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply mitorek --local",
