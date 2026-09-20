@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2d58dd26-61c9-4ca7-b93e-682a47acb9ad",
+  "id": "d3b466f6-7dea-4506-b6d9-7e297b3f6526",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "custom_places": {
@@ -1134,6 +1134,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "category_code": {
+          "name": "category_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "country_code": {
           "name": "country_code",
           "type": "text",
@@ -1150,6 +1157,13 @@
         }
       },
       "indexes": {
+        "ix_lines_category": {
+          "name": "ix_lines_category",
+          "columns": [
+            "category_code"
+          ],
+          "isUnique": false
+        },
         "lines_source_source_code_unique": {
           "name": "lines_source_source_code_unique",
           "columns": [
@@ -1160,15 +1174,28 @@
         }
       },
       "foreignKeys": {
-        "lines_operator_id_operators_id_fk": {
-          "name": "lines_operator_id_operators_id_fk",
+        "lines_operator_id_rail_operators_id_fk": {
+          "name": "lines_operator_id_rail_operators_id_fk",
           "tableFrom": "lines",
-          "tableTo": "operators",
+          "tableTo": "rail_operators",
           "columnsFrom": [
             "operator_id"
           ],
           "columnsTo": [
             "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "lines_category_code_rail_categories_code_fk": {
+          "name": "lines_category_code_rail_categories_code_fk",
+          "tableFrom": "lines",
+          "tableTo": "rail_categories",
+          "columnsFrom": [
+            "category_code"
+          ],
+          "columnsTo": [
+            "code"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -1178,8 +1205,39 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "operators": {
-      "name": "operators",
+    "rail_categories": {
+      "name": "rail_categories",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "rail_operators": {
+      "name": "rail_operators",
       "columns": {
         "id": {
           "name": "id",
@@ -1211,8 +1269,8 @@
         }
       },
       "indexes": {
-        "operators_source_source_code_unique": {
-          "name": "operators_source_source_code_unique",
+        "rail_operators_source_source_code_unique": {
+          "name": "rail_operators_source_source_code_unique",
           "columns": [
             "source",
             "source_code"

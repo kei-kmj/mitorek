@@ -37,3 +37,10 @@ lerna-debug.log*
 
 # generated
 worker-configuration.d.ts
+
+# 取り込み用スクリプトと生成した投入SQL（手元だけで使う）
+scripts/
+seeds/
+
+# DB のデータダンプ。npm run db:export で作る
+data/

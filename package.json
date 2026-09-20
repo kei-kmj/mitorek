@@ -12,7 +12,10 @@
     "test": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply mitorek --local",
-    "db:migrate:remote": "wrangler d1 migrations apply mitorek --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply mitorek --remote",
+    "db:export": "wrangler d1 export mitorek --local --no-schema --output data/mitorek-data.sql -y --table regions --table prefectures --table games --table collections --table spots --table rail_categories --table rail_operators --table lines --table stations --table station_lines --table spot_stations --table users --table visits --table visit_images --table trips --table days --table custom_places --table stops --table legs --table links",
+    "db:restore:local": "wrangler d1 execute mitorek --local --file data/mitorek-data.sql",
+    "db:restore:remote": "wrangler d1 execute mitorek --remote --file data/mitorek-data.sql"
   },
   "dependencies": {
     "@scalar/hono-api-reference": "^0.12.2",

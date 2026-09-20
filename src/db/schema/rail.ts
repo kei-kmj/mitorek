@@ -1,5 +1,6 @@
 import {
 	index,
+	integer,
 	primaryKey,
 	real,
 	sqliteTable,
@@ -12,8 +13,8 @@ import { prefectures, spots } from "./master.ts";
 // 鉄道マスタ (日本: 駅データ.jp / 国土数値情報, 台湾: TDX から取り込み)
 // ------------------------------------------------------------
 
-export const operators = sqliteTable(
-	"operators",
+export const railOperators = sqliteTable(
+	"rail_operators",
 	{
 		/** 自前の ULID */
 		id: text("id").primaryKey(),
@@ -27,17 +28,35 @@ export const operators = sqliteTable(
 	(table) => [unique().on(table.source, table.sourceCode)],
 );
 
+/**
+ * 鉄道区分。最寄り駅の候補からケーブルカー等を除くのに使う。
+ * 国土数値情報の RailwayClassCd をそのまま自然キーにしている。
+ * https://nlftp.mlit.go.jp/ksj/gml/codelist/RailwayClassCd.html
+ * 台湾など他の取り込み元は、対応する区分に寄せるか独自コードを足す。
+ */
+export const railCategories = sqliteTable("rail_categories", {
+	/** '11' = 普通鉄道JR, '21' = 軌道 … */
+	code: text("code").primaryKey(),
+	name: text("name").notNull(),
+	sortOrder: integer("sort_order").notNull(),
+});
+
 export const lines = sqliteTable(
 	"lines",
 	{
 		id: text("id").primaryKey(),
 		source: text("source").notNull(),
 		sourceCode: text("source_code").notNull(),
-		operatorId: text("operator_id").references(() => operators.id),
+		operatorId: text("operator_id").references(() => railOperators.id),
+		/** 鉄道区分。取り込み元に区分が無い場合は NULL */
+		categoryCode: text("category_code").references(() => railCategories.code),
 		countryCode: text("country_code").notNull(),
 		name: text("name").notNull(),
 	},
-	(table) => [unique().on(table.source, table.sourceCode)],
+	(table) => [
+		unique().on(table.source, table.sourceCode),
+		index("ix_lines_category").on(table.categoryCode),
+	],
 );
 
 export const stations = sqliteTable(

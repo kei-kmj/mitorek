@@ -16,7 +16,8 @@ import {
 } from "./schema/master.ts";
 import {
 	lines,
-	operators,
+	railCategories,
+	railOperators,
 	spotStations,
 	stationLines,
 	stations,
@@ -36,8 +37,9 @@ export const schema = {
 	legs,
 	lines,
 	links,
-	operators,
 	prefectures,
+	railCategories,
+	railOperators,
 	regions,
 	spotStations,
 	spots,

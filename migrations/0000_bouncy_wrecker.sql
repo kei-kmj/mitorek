@@ -161,20 +161,29 @@ CREATE TABLE `lines` (
 	`source` text NOT NULL,
 	`source_code` text NOT NULL,
 	`operator_id` text,
+	`category_code` text,
 	`country_code` text NOT NULL,
 	`name` text NOT NULL,
-	FOREIGN KEY (`operator_id`) REFERENCES `operators`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`operator_id`) REFERENCES `rail_operators`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`category_code`) REFERENCES `rail_categories`(`code`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
+CREATE INDEX `ix_lines_category` ON `lines` (`category_code`);--> statement-breakpoint
 CREATE UNIQUE INDEX `lines_source_source_code_unique` ON `lines` (`source`,`source_code`);--> statement-breakpoint
-CREATE TABLE `operators` (
+CREATE TABLE `rail_categories` (
+	`code` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`sort_order` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `rail_operators` (
 	`id` text PRIMARY KEY NOT NULL,
 	`source` text NOT NULL,
 	`source_code` text NOT NULL,
 	`name` text NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `operators_source_source_code_unique` ON `operators` (`source`,`source_code`);--> statement-breakpoint
+CREATE UNIQUE INDEX `rail_operators_source_source_code_unique` ON `rail_operators` (`source`,`source_code`);--> statement-breakpoint
 CREATE TABLE `spot_stations` (
 	`spot_id` text NOT NULL,
 	`station_id` text NOT NULL,
