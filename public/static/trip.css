@@ -1,0 +1,244 @@
+/* 旅程: 一覧と編集 (src/pages/trips.tsx, trip.tsx)。色の変数は app.css */
+.page {
+	max-width: 880px;
+	padding: 16px;
+	margin: 0 auto;
+}
+
+.page h1 {
+	font-size: 1.25rem;
+}
+
+.trip-list {
+	padding: 0;
+	list-style: none;
+}
+
+.trip-list li {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	align-items: baseline;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.trip-list a,
+.page a {
+	color: var(--accent);
+}
+
+.trip-form {
+	display: grid;
+	gap: 8px;
+	padding: 12px;
+	margin-bottom: 16px;
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+}
+
+.field,
+.trip-form > label {
+	display: grid;
+	gap: 2px;
+	font-size: 0.85em;
+	color: var(--muted);
+}
+
+.trip-form-main {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	align-items: flex-end;
+}
+
+.trip-memo textarea {
+	width: min(100%, 720px);
+	resize: vertical;
+}
+
+.page .add-memo {
+	justify-self: start;
+	color: var(--accent);
+	background: none;
+	border: 0;
+}
+
+.actions {
+	display: flex;
+	gap: 8px;
+}
+
+.page input,
+.page select,
+.page textarea,
+.page button {
+	font: inherit;
+	color: inherit;
+}
+
+.page button {
+	padding: 2px 10px;
+	cursor: pointer;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+}
+
+.page button:disabled {
+	cursor: default;
+	opacity: 0.4;
+}
+
+/* 主な操作 (保存・作る): テーマカラーの塗り */
+.page button.primary {
+	font-weight: 600;
+	color: var(--on-accent);
+	background: var(--accent);
+	border-color: var(--accent);
+}
+
+.page button.primary:hover {
+	filter: brightness(1.1);
+}
+
+/* 削除: 差し色の枠線と文字だけ。取り返しがつかないので、塗りにして目立たせすぎない */
+.page button.danger {
+	color: var(--danger);
+	background: var(--bg);
+	border-color: var(--danger);
+}
+
+.page button.danger:hover {
+	color: var(--on-accent);
+	background: var(--danger);
+}
+
+.error {
+	color: var(--danger);
+}
+
+.day {
+	padding: 12px 0;
+	border-top: 2px solid var(--border);
+}
+
+.day h2 {
+	margin: 0 0 8px;
+	font-size: 1.05rem;
+}
+
+.stops {
+	padding: 0;
+	margin: 0 0 8px;
+	list-style: none;
+}
+
+.stop {
+	padding: 8px;
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+}
+
+.stop-head {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.stop-emoji {
+	font-size: 1.4em;
+	line-height: 1;
+}
+
+.stop-actions {
+	display: flex;
+	gap: 4px;
+	margin-left: auto;
+}
+
+.stop-fields {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	margin-top: 6px;
+}
+
+.leg {
+	display: grid;
+	gap: 6px;
+	padding: 6px 8px 6px 24px;
+	font-size: 0.9em;
+	color: var(--muted);
+}
+
+/* 1 段目: 手段・時刻・経路 */
+.leg-main {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	align-items: center;
+}
+
+/* 2 段目: メモ。矢印の幅だけ字下げして、1 段目の手段の下からそろえる */
+.leg-memo textarea {
+	width: min(100%, 640px);
+	margin-left: 1.6em;
+	resize: vertical;
+}
+
+.page .leg-add-memo {
+	justify-self: start;
+	margin-left: 1.6em;
+	color: var(--accent);
+	background: none;
+	border: 0;
+}
+
+.leg-arrow {
+	font-size: 1.2em;
+}
+
+.leg input[type="url"] {
+	width: min(100%, 260px);
+}
+
+.add-stop summary {
+	color: var(--accent);
+	cursor: pointer;
+}
+
+.add-stop input[type="search"] {
+	width: min(100%, 360px);
+	margin: 8px 8px 0 0;
+}
+
+.candidates {
+	padding: 0;
+	margin: 4px 0;
+	list-style: none;
+}
+
+.candidates button {
+	width: 100%;
+	padding: 6px 4px;
+	text-align: left;
+	border: 0;
+	border-bottom: 1px solid var(--border);
+	border-radius: 0;
+}
+
+.geocode-item {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	align-items: center;
+	padding: 6px 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.address-search {
+	margin-top: 12px;
+}

@@ -57,6 +57,8 @@
 - テーブル: `rail_categories`, `rail_operators`, `lines`, `stations`, `station_lines`, `spot_stations`
 
 ### F4 旅程
+- 画面上の呼び名は「おでかけプラン」（「旅程」は硬いため）。コード・API・この設計メモでは trips / 旅程 のまま
+- 自分の地点（宿など）は、住所（国土地理院 地名検索）か施設名（OpenStreetMap Nominatim）から座標を引いて登録する。Nominatim は利用規約により入力のたびの検索をせず、ボタンを押したときだけ呼ぶ。出典は候補の近くに表示
 - `trips` → `days` → `stops`（地点の列。spot / station / custom_place のどれか 1 つを FK で参照）と `legs`（stop 間の移動：手段・出発/到着時刻・経路URL）
 - ホテル・駐車場などは `custom_places`（利用者定義の地点）に 1 回登録し、複数の stop から再利用（1 日目の終点と 2 日目の始点が同じホテル）
 - `days` は `date` が順序を兼ねる（`seq` なし、`UNIQUE(trip_id, date)`）
@@ -172,11 +174,13 @@ URL 設計は API 節（`/api/...`）と画面（`/`（ホーム: 到達状況�
 2. 半径のデフォルト値と、stop 中心 / 最寄り駅中心の両方を出すか。実地で決める。
 3. `spot_gps_samples` からマスタ座標を更新する集計ルール（中央値・件数閾値）。公開後でよい。
 4. お土産の「交換で入手済み＝行かなくてよい」を扱うか。扱うなら `spots` ではなく per-user の skip テーブル。
+5. 宿などの施設名検索の強化（2026-09-21 に保留）。今は国土地理院（住所）＋ OpenStreetMap Nominatim（施設名）で、施設名は正式名称・網羅とも弱い（スーパーホテル松本駅前が「スーパーホテル」としか出ない、蔵前のアパホテルが一部しか出ない等）。住所で探して名前を書き換えて登録すれば当面は足りる。候補は Google（地図ごと移行が必要。Places の内容は Google 以外の地図に出せず、座標の保存は 30 日まで）か楽天トラベル施設検索 API（宿のみ。利用条件は未確認）。
 
 ## 参照
 
 - 国土地理院 地名検索 API: https://msearch.gsi.go.jp/address-search/AddressSearch?q=
 - 地理院タイル一覧（淡色地図・利用規約）: https://maps.gsi.go.jp/development/ichiran.html
+- OpenStreetMap Nominatim（施設名の検索・利用規約）: https://nominatim.org/release-docs/latest/api/Search/ / https://operations.osmfoundation.org/policies/nominatim/
 - 国土地理院 逆ジオコーダ: https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress
 - 国土数値情報 鉄道データ: https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html
 - 国土数値情報 鉄道区分コード: https://nlftp.mlit.go.jp/ksj/gml/codelist/RailwayClassCd.html

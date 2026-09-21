@@ -18,8 +18,8 @@
 			"bucket_name": "mitorek-images"
 		}
 	],
-	// 認証 (better-auth) が入るまでの固定利用者。users.id に合わせる。認証導入時に消す
-	"vars": { "DEV_USER_ID": "dev" }
+	// 認証 (better-auth) が入るまでの固定利用者。ローカル D1 の users に同じ id の行がある。認証導入時に消す
+	"vars": { "DEV_USER_ID": "01M31AGK3ABN7NF1P12QJVYGQ0" }
 	// "compatibility_flags": [
 	//   "nodejs_compat"
 	// ],

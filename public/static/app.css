@@ -4,20 +4,15 @@
 	--bg: rgb(255 255 255);
 	--panel: rgb(246 248 250);
 	--border: rgb(209 217 224);
-	--accent: rgb(9 105 218);
+	/* テーマカラー (青緑)。ヘッダーの帯・リンク・強調に使う */
+	--accent: rgb(17 118 122);
+	/* テーマカラーの上に載せる文字色 */
+	--on-accent: rgb(255 255 255);
+	/* 差し色 (削除・エラー)。テーマカラーの青緑と補色の関係にある柔らかい赤 */
+	--danger: rgb(214 69 65);
 	--header-h: 44px;
-	color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-	:root {
-		--fg: rgb(230 237 243);
-		--muted: rgb(145 152 161);
-		--bg: rgb(13 17 23);
-		--panel: rgb(21 27 35);
-		--border: rgb(61 68 77);
-		--accent: rgb(68 147 248);
-	}
+	/* 利用者はエンジニアに限らないので、OS がダークモードでも明るい表示に固定する */
+	color-scheme: light;
 }
 
 * {
@@ -37,7 +32,8 @@ body {
 	align-items: baseline;
 	height: var(--header-h);
 	padding: 10px 16px;
-	border-bottom: 1px solid var(--border);
+	color: var(--on-accent);
+	background: var(--accent);
 }
 
 .brand {
@@ -52,15 +48,22 @@ body {
 }
 
 .site-nav a {
-	color: var(--accent);
+	color: inherit;
 	text-decoration: none;
+}
+
+.site-nav a:hover {
+	text-decoration: underline;
 }
 
 .tagline {
 	margin-left: auto;
+	/* 帯の上なので、ほかの補足文 (灰色) ではなく白を少し薄くする */
+	font-size: 0.85em;
+	color: var(--on-accent);
+	opacity: 0.8;
 }
 
-.tagline,
 .hint,
 .count,
 .meta,

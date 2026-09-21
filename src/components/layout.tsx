@@ -9,6 +9,8 @@ interface Props {
 	leaflet?: boolean;
 	/** ページ固有の script (public/ 配下のパス) */
 	script?: string;
+	/** ページ固有の CSS (public/ 配下のパス)。app.css の後に読む */
+	stylesheet?: string;
 	title?: string;
 }
 
@@ -20,7 +22,13 @@ const pageTitle = (title?: string) => {
 };
 
 /** JSX は DOCTYPE を出さない。無いと標準モードにならず地図の高さ計算が崩れる */
-export const Layout = ({ children, leaflet, script, title }: Props) => (
+export const Layout = ({
+	children,
+	leaflet,
+	script,
+	stylesheet,
+	title,
+}: Props) => (
 	<>
 		{raw("<!DOCTYPE html>")}
 		<html lang="ja">
@@ -37,6 +45,7 @@ export const Layout = ({ children, leaflet, script, title }: Props) => (
 					/>
 				)}
 				<link href="/static/app.css" rel="stylesheet" />
+				{stylesheet && <link href={stylesheet} rel="stylesheet" />}
 			</head>
 			<body>
 				<header class="site-header">
@@ -46,6 +55,7 @@ export const Layout = ({ children, leaflet, script, title }: Props) => (
 					<nav class="site-nav">
 						<a href="/">ホーム</a>
 						<a href="/map">地図</a>
+						<a href="/trips">おでかけプラン</a>
 					</nav>
 					<span class="tagline">非公式・個人用の旅程ツール</span>
 				</header>

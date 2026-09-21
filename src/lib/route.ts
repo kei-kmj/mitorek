@@ -3,7 +3,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute, resolver, validator } from "hono-openapi";
 import type { Db } from "../db/client";
 import type { Env, UserId } from "../env";
-import { type CREATED, OK } from "./http";
+import { BAD_REQUEST, type CREATED, OK } from "./http";
 
 /** スキーマ未指定なら undefined、指定ありなら検証・変換後 (morph 適用後) の型 */
 type Out<S> = S extends Type ? S["infer"] : undefined;
@@ -31,7 +31,7 @@ const passThrough: Handler = async (_c, next) => {
 	await next();
 };
 
-/** スキーマがあればその validator、なければ素通し */
+/** スキーマがあればその validator、なければ素通し。検証失敗は onError と同じ形で 400 を返す */
 const validatorOr = (
 	target: "query" | "param" | "json",
 	schema: Type | undefined,
@@ -39,7 +39,13 @@ const validatorOr = (
 	if (!schema) {
 		return passThrough;
 	}
-	return validator(target, schema);
+	return validator(target, schema, (result, c) => {
+		if (result.success) {
+			return;
+		}
+		const message = result.error.map((issue) => issue.message).join("; ");
+		return c.json({ error: { code: BAD_REQUEST, message } }, BAD_REQUEST);
+	});
 };
 
 /** ハンドラに注入されるもの。FastAPI の Depends() 相当 */

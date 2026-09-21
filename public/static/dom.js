@@ -20,3 +20,13 @@ export const getJson = async (url, init) => {
 	}
 	return res.json();
 };
+
+/** JSON を送る。失敗も例外にせず { status, json } で返す (409 などを呼び出し側で分けるため) */
+export const sendJson = async (method, url, body) => {
+	const init = { headers: { "content-type": "application/json" }, method };
+	if (body !== undefined) {
+		init.body = JSON.stringify(body);
+	}
+	const res = await fetch(url, init);
+	return { json: await res.json(), status: res.status };
+};
