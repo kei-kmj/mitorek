@@ -8,10 +8,10 @@ import {
 	text,
 	unique,
 } from "drizzle-orm/sqlite-core";
-import { now, oneOf } from "./common.ts";
-import { spots } from "./master.ts";
-import { stations } from "./rail.ts";
-import { users } from "./users.ts";
+import { now, oneOf } from "./common";
+import { spots } from "./master";
+import { stations } from "./rail";
+import { users } from "./users";
 
 // ------------------------------------------------------------
 // 旅程: trips → days → stops

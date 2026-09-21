@@ -1,5 +1,5 @@
 import { check, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { now, oneOf } from "./common.ts";
+import { now, oneOf } from "./common";
 
 export const userStatuses = ["invited", "active", "suspended"] as const;
 

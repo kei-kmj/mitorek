@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { createDb } from "./db/client.ts";
-import { games } from "./db/schema/master.ts";
+import { createDb } from "./db/client";
+import { games } from "./db/schema/master";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 

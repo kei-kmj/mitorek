@@ -1,10 +1,10 @@
 import { env } from "cloudflare:test";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { createDb } from "../src/db/client.ts";
-import { games } from "../src/db/schema/master.ts";
-import { users } from "../src/db/schema/users.ts";
-import app from "../src/index.ts";
+import { createDb } from "../src/db/client";
+import { games } from "../src/db/schema/master";
+import { users } from "../src/db/schema/users";
+import app from "../src/index";
 
 const CHECK_FAILED = /CHECK constraint failed: users_status_check/;
 

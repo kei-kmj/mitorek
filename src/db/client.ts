@@ -6,14 +6,14 @@ import {
 	links,
 	stops,
 	trips,
-} from "./schema/itinerary.ts";
+} from "./schema/itinerary";
 import {
 	collections,
 	games,
 	prefectures,
 	regions,
 	spots,
-} from "./schema/master.ts";
+} from "./schema/master";
 import {
 	lines,
 	railCategories,
@@ -21,9 +21,9 @@ import {
 	spotStations,
 	stationLines,
 	stations,
-} from "./schema/rail.ts";
-import { users } from "./schema/users.ts";
-import { visitImages, visits } from "./schema/visits.ts";
+} from "./schema/rail";
+import { users } from "./schema/users";
+import { visitImages, visits } from "./schema/visits";
 
 /**
  * リレーショナルクエリ用のスキーマ一式。

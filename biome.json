@@ -6,7 +6,13 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!migrations", "!package.json", "!package-lock.json"]
+		"includes": [
+			"**",
+			"!.claude/skills",
+			"!migrations",
+			"!package.json",
+			"!package-lock.json"
+		]
 	},
 	"formatter": { "enabled": true, "indentStyle": "tab" },
 	"javascript": { "formatter": { "quoteStyle": "double" } },
@@ -30,6 +36,9 @@
 		},
 		"enabled": true,
 		"rules": {
+			"correctness": {
+				"useImportExtensions": "off"
+			},
 			"nursery": { "preset": "all" },
 			"preset": "all",
 			"security": { "noSecrets": "off" },

@@ -7,7 +7,7 @@ import {
 	text,
 	unique,
 } from "drizzle-orm/sqlite-core";
-import { prefectures, spots } from "./master.ts";
+import { prefectures, spots } from "./master";
 
 // ------------------------------------------------------------
 // 鉄道マスタ (日本: 駅データ.jp / 国土数値情報, 台湾: TDX から取り込み)

@@ -6,7 +6,7 @@ import {
 	sqliteTable,
 	text,
 } from "drizzle-orm/sqlite-core";
-import { now, oneOf } from "./common.ts";
+import { now, oneOf } from "./common";
 
 // ------------------------------------------------------------
 // ゲーム / プリセットの束 ('dqw', 'pokefuta' …)

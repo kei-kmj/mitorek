@@ -1,6 +1,5 @@
 {
 	"compilerOptions": {
-		"allowImportingTsExtensions": true,
 		"jsx": "react-jsx",
 		"jsxImportSource": "hono/jsx",
 		"lib": ["ESNext"],

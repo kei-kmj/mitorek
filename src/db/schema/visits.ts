@@ -5,9 +5,9 @@ import {
 	sqliteTable,
 	text,
 } from "drizzle-orm/sqlite-core";
-import { now } from "./common.ts";
-import { spots } from "./master.ts";
-import { users } from "./users.ts";
+import { now } from "./common";
+import { spots } from "./master";
+import { users } from "./users";
 
 // ------------------------------------------------------------
 // 訪問記録 (イベント。同じスポットに複数回あってよい)
