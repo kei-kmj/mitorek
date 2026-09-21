@@ -22,6 +22,9 @@ const SPOT_ZOOM = 14;
 const TILE_OPACITY = 0.6;
 /** app.css の .pin と揃える。絵文字だけなので、みんドラの丸アイコン (36px) より少し大きめ */
 const PIN_SIZE = 40;
+const CLOSE_SIZE = 24;
+/** 円の右上 (45°) のふちに × を置く。bounds の角から中心へ 1/√2 戻した点 */
+const DIAGONAL = Math.SQRT1_2;
 /** 近傍検索に送る座標の桁 (約 0.1m) */
 const COORD_DIGITS = 6;
 const HTTP_URL = /^https?:\/\//u;
@@ -63,6 +66,7 @@ const unvisitedOnly = document.getElementById("unvisited-only");
 const radiusSelect = document.getElementById("radius");
 const nearbyStatus = document.getElementById("nearby-status");
 const nearbyList = document.getElementById("nearby-list");
+const nearbyClear = document.getElementById("nearby-clear");
 
 const nearbyLayer = L.layerGroup().addTo(map);
 const spotLayer = L.layerGroup().addTo(map);
@@ -105,8 +109,10 @@ const popupOf = (spot) =>
 				textContent: "公式ページ",
 			}),
 		el("button", {
-			onclick: () => showNearby(L.latLng(spot.lat, spot.lng)),
-			textContent: "ここから近くの未訪問を探す",
+			// 起点のスポット自身は結果から外す (距離 0 で必ず先頭に出てしまう)
+			onclick: () =>
+				showNearby(L.latLng(spot.lat, spot.lng), { excludeId: spot.id }),
+			textContent: "近くのスポットを探す",
 			type: "button",
 		}),
 	);
@@ -153,13 +159,54 @@ const nearbyItem = (spot) =>
 		),
 	);
 
-/** 地点から半径内の未訪問を距離順に出す。表示中のコレクションだけに絞る */
-async function showNearby(latlng) {
+/** 検索のたびに増やす。消した後や次の検索の後に、古い検索の結果を描かないため */
+let searchSeq = 0;
+
+/** 円と検索結果を消す (左の「クリア」と、地図上の × から) */
+const clearNearby = () => {
+	searchSeq += 1;
+	nearbyLayer.clearLayers();
+	nearbyStatus.textContent = "";
+	nearbyList.replaceChildren();
+	nearbyClear.hidden = true;
+};
+
+/** 円の右上のふちに置く × ボタン。マーカーなのでクリックは地図 (= 新しい検索) に伝わらない */
+const closeMarker = (circle) => {
+	const center = circle.getLatLng();
+	const ne = circle.getBounds().getNorthEast();
+	const at = L.latLng(
+		center.lat + (ne.lat - center.lat) * DIAGONAL,
+		center.lng + (ne.lng - center.lng) * DIAGONAL,
+	);
+	return L.marker(at, {
+		icon: L.divIcon({
+			className: "nearby-close",
+			html: "×",
+			iconAnchor: [CLOSE_SIZE / 2, CLOSE_SIZE / 2],
+			iconSize: [CLOSE_SIZE, CLOSE_SIZE],
+		}),
+		keyboard: true,
+		title: "円と検索結果を消す",
+	}).on("click", clearNearby);
+};
+
+/**
+ * 地点から半径内の未訪問を距離順に出す。表示中のコレクションだけに絞る。
+ * スポットを起点にしたときは excludeId でそのスポットを除く
+ */
+async function showNearby(latlng, { excludeId } = {}) {
+	searchSeq += 1;
+	const seq = searchSeq;
 	const radius = Number(radiusSelect.value);
 	nearbyLayer.clearLayers();
-	L.circle(latlng, { className: "nearby-circle", radius }).addTo(nearbyLayer);
+	const circle = L.circle(latlng, { className: "nearby-circle", radius });
+	// × の位置は円の大きさから決まるので、先に地図へ載せてから求める
+	circle.addTo(nearbyLayer);
+	closeMarker(circle).addTo(nearbyLayer);
 	nearbyStatus.textContent = "検索中…";
 	nearbyList.replaceChildren();
+	nearbyClear.hidden = false;
 
 	const params = new URLSearchParams({
 		lat: latlng.lat.toFixed(COORD_DIGITS),
@@ -168,18 +215,24 @@ async function showNearby(latlng) {
 	});
 	try {
 		const selected = selectedCollections();
-		const found = (await getJson(`/api/spots/nearby?${params}`)).filter((s) =>
-			selected.has(s.collectionId),
+		const found = (await getJson(`/api/spots/nearby?${params}`)).filter(
+			(s) => selected.has(s.collectionId) && s.id !== excludeId,
 		);
+		if (seq !== searchSeq) {
+			return;
+		}
 		nearbyStatus.textContent = `半径 ${formatKm(radius)} (直線距離) に未訪問 ${found.length} 件`;
 		nearbyList.replaceChildren(...found.map(nearbyItem));
 	} catch (error) {
-		nearbyStatus.textContent = `取得に失敗しました (${error.message})`;
+		if (seq === searchSeq) {
+			nearbyStatus.textContent = `取得に失敗しました (${error.message})`;
+		}
 	}
 }
 
 // ピンや駅のクリックは地図まで伝わらないので、ここに来るのは地図の空き地だけ
 map.on("click", (e) => showNearby(e.latlng));
+nearbyClear.addEventListener("click", clearNearby);
 for (const box of [...collectionBoxes, unvisitedOnly]) {
 	box.addEventListener("change", renderSpots);
 }

@@ -1,18 +1,20 @@
 // 地図の駅表示。自前の stations テーブルを表示範囲の分だけ取り、点で出す。
-// 駅名は背景の地図 (淡色地図) にあるので重ねない。点はクリックで路線と近傍検索を出すためのもの
+// 駅名は背景の地図 (淡色地図) にあるので重ねない。点はクリックで路線と「近くのスポットを探す」を出すためのもの
 import { el, getJson } from "./dom.js";
 
 const { L } = globalThis;
 
 /** これより引いた縮尺では駅を出さない (数が多すぎて線路が見えなくなる) */
 const STATIONS_MIN_ZOOM = 11;
+/** 都市部では点が密集するので、縁を薄く細くして地図とピンの邪魔をしない */
 const DOT_RADIUS_PX = 4;
+const CLICK_TOLERANCE_PX = 4;
 /** canvas に描くので CSS は効かない。色はオプションで渡す */
 const DOT_STYLE = {
-	color: "#4a4a4a",
+	color: "#9aa0a6",
 	fillColor: "#ffffff",
 	fillOpacity: 1,
-	weight: 1.5,
+	weight: 1,
 };
 
 /** API が受け付ける矩形の最大幅 (度)。src/schemas/stations.ts と揃える */
@@ -74,19 +76,20 @@ const popupOf = (station, onNearby) =>
 		el("strong", { textContent: `🚉 ${station.name}` }),
 		...linesByOperator(station.lines),
 		el("button", {
-			onclick: () => onNearby({ lat: station.lat, lng: station.lng }),
-			textContent: "この駅から近くの未訪問を探す",
+			onclick: () => onNearby(L.latLng(station.lat, station.lng)),
+			textContent: "近くのスポットを探す",
 			type: "button",
 		}),
 	);
 
 /**
  * 地図が止まるたびに、必要なら表示範囲の駅を取り直す。
- * onNearby(center) は呼び出し側 (map.js) の近傍検索
+ * onNearby(latlng) は呼び出し側 (map.js) の近傍検索
  */
 export const bindStations = (map, { onNearby }) => {
 	// 駅は数が多いので DOM ではなく canvas に描く
-	const renderer = L.canvas();
+	// 点を小さくしたので、クリックの当たり判定だけ周り数 px まで広げる
+	const renderer = L.canvas({ tolerance: CLICK_TOLERANCE_PX });
 	const layer = L.layerGroup();
 	let loaded = null;
 	let pending = null;

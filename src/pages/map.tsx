@@ -56,7 +56,12 @@ export const MapPage = ({ collections }: { collections: Collection[] }) => (
 							))}
 						</select>
 					</label>
-					<p class="hint" id="nearby-status" />
+					<div class="nearby-head">
+						<p class="hint" id="nearby-status" />
+						<button hidden={true} id="nearby-clear" type="button">
+							クリア
+						</button>
+					</div>
 					<ol class="nearby" id="nearby-list" />
 				</section>
 			</aside>
