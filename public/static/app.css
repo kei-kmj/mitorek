@@ -1,0 +1,237 @@
+:root {
+	--fg: rgb(31 35 40);
+	--muted: rgb(89 99 110);
+	--bg: rgb(255 255 255);
+	--panel: rgb(246 248 250);
+	--border: rgb(209 217 224);
+	--accent: rgb(9 105 218);
+	--header-h: 44px;
+	color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--fg: rgb(230 237 243);
+		--muted: rgb(145 152 161);
+		--bg: rgb(13 17 23);
+		--panel: rgb(21 27 35);
+		--border: rgb(61 68 77);
+		--accent: rgb(68 147 248);
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font-family: system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;
+	color: var(--fg);
+	background: var(--bg);
+}
+
+.site-header {
+	display: flex;
+	gap: 12px;
+	align-items: baseline;
+	height: var(--header-h);
+	padding: 10px 16px;
+	border-bottom: 1px solid var(--border);
+}
+
+.brand {
+	font-weight: 700;
+	color: inherit;
+	text-decoration: none;
+}
+
+.site-nav {
+	display: flex;
+	gap: 12px;
+}
+
+.site-nav a {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+.tagline {
+	margin-left: auto;
+}
+
+.tagline,
+.hint,
+.count,
+.meta,
+.distance {
+	font-size: 0.85em;
+	color: var(--muted);
+}
+
+.map-layout {
+	display: grid;
+	grid-template-columns: 300px 1fr;
+	height: calc(100dvh - var(--header-h));
+}
+
+.panel {
+	padding: 12px 16px;
+	overflow-y: auto;
+	background: var(--panel);
+	border-right: 1px solid var(--border);
+}
+
+.panel h2 {
+	margin: 8px 0;
+	font-size: 1rem;
+}
+
+.collections,
+.nearby {
+	padding: 0;
+	margin: 0 0 12px;
+	list-style: none;
+}
+
+.collections label {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	padding: 3px 0;
+}
+
+.collections .count {
+	margin-left: auto;
+}
+
+.nearby button {
+	display: flex;
+	gap: 8px;
+	justify-content: space-between;
+	width: 100%;
+	padding: 6px 4px;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+	background: none;
+	border: 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.nearby button:hover {
+	background: var(--bg);
+}
+
+#map {
+	height: 100%;
+}
+
+/* ホーム */
+.home {
+	max-width: 720px;
+	padding: 16px;
+	margin: 0 auto;
+}
+
+.home h1 {
+	font-size: 1.25rem;
+}
+
+.home h2 {
+	font-size: 1.05rem;
+}
+
+.progress-list,
+.entry-list {
+	padding: 0;
+	margin: 0;
+	list-style: none;
+}
+
+.progress-list li {
+	display: grid;
+	grid-template-columns: 1.5em 1fr minmax(80px, 160px);
+	gap: 4px 8px;
+	align-items: center;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.progress-list progress {
+	width: 100%;
+}
+
+.progress-list .count {
+	grid-column: 2 / -1;
+}
+
+.entry-list li {
+	display: grid;
+	gap: 2px;
+	padding: 8px 0;
+}
+
+.entry-list a {
+	font-weight: 600;
+	color: var(--accent);
+}
+
+.popup {
+	display: grid;
+	gap: 4px;
+	min-width: 180px;
+}
+
+.popup .note {
+	white-space: pre-wrap;
+}
+
+.popup button {
+	margin-top: 4px;
+	cursor: pointer;
+}
+
+/* ピン: 絵文字だけ。白いふち取りの影で地図から浮かせる。訪問済みはグレーアウト */
+.pin {
+	display: grid;
+	place-items: center;
+	/* map.js の PIN_SIZE と揃える */
+	width: 40px;
+	height: 40px;
+	font-size: 34px;
+	line-height: 1;
+	filter: drop-shadow(0 0 1px rgb(255 255 255))
+		drop-shadow(0 0 2px rgb(255 255 255))
+		drop-shadow(0 1px 2px rgb(0 0 0 / 50%));
+}
+
+.pin.is-visited {
+	filter: grayscale(1) opacity(0.45) drop-shadow(0 0 1px rgb(255 255 255));
+}
+
+.nearby-circle {
+	fill: var(--accent);
+	fill-opacity: 0.08;
+	stroke: var(--accent);
+}
+
+@media (max-width: 720px) {
+	.map-layout {
+		grid-template-rows: 60dvh auto;
+		grid-template-columns: 1fr;
+		height: auto;
+	}
+
+	.panel {
+		order: 2;
+		border-top: 1px solid var(--border);
+		border-right: 0;
+	}
+
+	#map {
+		order: 1;
+		height: 60dvh;
+	}
+}

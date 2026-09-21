@@ -1,6 +1,6 @@
 # mitorek（ミトレク）設計メモ v0.1
 
-名前: mitorek（未踏 + trek）。表示名は「mitorek」、日本語表記「ミトレク」。ロゴは人の足跡（未訪問=輪郭、訪問済み=塗り。地図ピンの状態表現と共通）。リポジトリ・パッケージ: `mitorek`
+名前: mitorek（未踏 + trek）。表示名は「mitorek」、日本語表記「ミトレク」。ロゴは人の足跡（未訪問=輪郭、訪問済み=塗り）。地図ピンは絵文字で、訪問済みをグレーアウトする（ロゴとは別の表現）。リポジトリ・パッケージ: `mitorek`
 
 ## 目的
 
@@ -25,7 +25,7 @@
 - 自宅圏（`users.home_*`）内のポイント・写真・stop は公開処理で除外または県名まで丸める。
 - ゲーム素材（画像・ロゴ・アイコン）は使わない。名称は文字のみ。非公式と明記。
 - DQW は共有コレクションの一つ。アプリ自体は「訪問対象を登録して取りこぼしを防ぐ旅程ツール」。
-- フロントは Hono の JSX で SSR。地図ページなど動く部分だけ `hono/jsx/dom` で島化。地図は Leaflet + OSM。Astro は記事機能が肥大したときに前段へ足す案として保留。
+- フロントは Hono の JSX で SSR。地図ページなど動く部分だけ `hono/jsx/dom` で島化。地図は Leaflet + 地理院タイル（淡色地図）を不透明度 60% で敷く。標準地図の陰影・地形の色分けが無く、残る等高線・標高点も不透明度で目立たなくする。駅名は背景地図のものを使い、自前では重ねない（自前の駅は点だけ。クリックで路線と近傍検索）。登録不要で利用上限も無い。検討して見送った案: 標準地図を不透明度 50%（陰影・標高が邪魔）、Esri（現行版は ArcGIS 登録と API キーが必要、旧 World Street Map は更新停止）、Google Maps（請求アカウント必須、Map Tiles API は無料枠 月 10 万枚）、MapLibre + 地理院ベクトルタイル。Astro は記事機能が肥大したときに前段へ足す案として保留。
 
 ## 機能一覧 → テーブル対応
 
@@ -36,7 +36,7 @@
 - 座標の出所（`coord_source`: geocode / manual / gps。gps は自分の `visits` の座標で上書きしたもの）、廃止は `retired_at` の論理削除
 - 公式URLは NULL 可、後から埋める（OGP リンクカード用）
 - アイコンは Unicode 絵文字をコードポイントで `collections.icon` に持ち、SVG セット（Twemoji 等）を自前配信。ゲーム素材は使わない
-- 色はマスタに持たない。塗り分け軸（コレクション／グループ／訪問状態／難易度）は表示設定で切り替え、パレットはアプリ側
+- 色はマスタに持たない。塗り分け軸（コレクション／グループ／訪問状態／難易度）は表示設定で切り替え、パレットはアプリ側。今の地図のピンは色を使わず、コレクションの絵文字だけを出す（訪問済みはグレーアウト）
 - 名称は `spots.name` にゲーム（日本語版）の表示名をそのまま持つ。多言語表記の表は作らない（必要になれば後から足せる）
 - 行政区は `prefectures`（国＋都道府県／県市）。地方は `prefectures.region_id` → `regions`（自然キー）で導出し、spots には持たない。三重=近畿のようなゲーム内区分は prefectures 側の値で表す
 - テーブル: `games`, `regions`, `collections`, `spots`, `prefectures`
@@ -118,14 +118,14 @@ src/
   routes/       spots.ts, trips.ts, visits.ts, stats.ts, places.ts, stations.ts, index.ts（束ねる）
                 app.get + describeRoute + validator。薄いハンドラのみ（コントローラクラスは作らない）
   models/       routes と同名。SQL を持つ関数 (db, userId, params) => rows。Drizzle / sql テンプレート
-  pages/        画面 1 枚 = 1 ファイル。map.tsx, spot.tsx, trips.tsx, trip.tsx, stats.tsx, public-trip.tsx
+  pages/        画面 1 枚 = 1 ファイル。home.tsx, map.tsx, spot.tsx, trips.tsx, trip.tsx, stats.tsx, public-trip.tsx
   components/   layout.tsx, spot-card.tsx, marker-icon.tsx など共通部品
   schemas/      ArkType。API の入出力型。routes 間で共有
   lib/          純粋関数。geo.ts（Haversine）, urls.ts（Google / ジョルダン URL）, itinerary.ts（並べ替え→legs 差分）
   db/schema/    Drizzle のテーブル定義（正）
 ```
 
-URL 設計は API 節（`/api/...`）と画面（`/`, `/spots/:id`, `/stats`, `/trips`, `/trips/:id`, `/trips/:id/check`, `/visits`, `/p/:tripId`）。`/places` の画面は持たず、旅程エディタから custom_places を作る。
+URL 設計は API 節（`/api/...`）と画面（`/`（ホーム: 到達状況と各画面への入口）, `/map`（地図）, `/spots/:id`, `/stats`, `/trips`, `/trips/:id`, `/trips/:id/check`, `/visits`, `/p/:tripId`）。`/places` の画面は持たず、旅程エディタから custom_places を作る。
 
 ## フェーズ
 
@@ -134,7 +134,7 @@ URL 設計は API 節（`/api/...`）と画面（`/`, `/spots/:id`, `/stats`, `/
 | 0 | マスタ転記・ジオコーディング・駅データ整形・スキーマ確定 | 完了 |
 | 1 | D1 投入、F5 近傍クエリ、F3 全国/地方/県カウント（API のみ） | 連休 1日目 |
 | 2 | F4 旅程 CRUD、F6 自動生成リンク | 連休 2〜3日目 |
-| 3 | F5 stop 追加時の警告、Leaflet 地図、F2 訪問登録 | 連休 4〜5日目 |
+| 3 | F5 stop 追加時の警告、地図、F2 訪問登録 | 連休 4〜5日目 |
 | 4 | F7 記事、F3 路線別、写真、OGP カード、AI 旅程生成 | 連休後 |
 | 5 | 公開準備（規約・Turnstile・提案テーブル・他プリセット） | 使ってみてから |
 | 6 | 台湾プリセット（TDX 駅データ・Nominatim）、UI 多言語、共有（F9）、訪問難易度 | 予定が見えてから |
@@ -154,6 +154,7 @@ URL 設計は API 節（`/api/...`）と画面（`/`, `/spots/:id`, `/stats`, `/
 - 城・ご当地の里：ゲーム内の一覧および公式サイトの情報に基づく
 - お土産・まものランド：公開されている攻略情報を参考に名称を作成。ゲーム内の図鑑には未取得のランドマーク名が表示されないため、現地で未確認のものを含む
 - 座標：施設の住所・名称から国土地理院 地名検索 API および OpenStreetMap（© OpenStreetMap contributors, ODbL）で独自にジオコーディング。利用者の訪問時の位置情報により順次補正
+- 背景地図：地理院タイル 淡色地図（国土地理院）
 - 駅・路線：国土数値情報 鉄道データ（国土交通省）。駅の都道府県は国土地理院 逆ジオコーダで付与
 - 住所・公式リンク：各施設・自治体の公開情報
 - スクウェア・エニックス株式会社とは無関係の非公式ツール。ゲーム内の画像・素材は使用しない
@@ -175,6 +176,7 @@ URL 設計は API 節（`/api/...`）と画面（`/`, `/spots/:id`, `/stats`, `/
 ## 参照
 
 - 国土地理院 地名検索 API: https://msearch.gsi.go.jp/address-search/AddressSearch?q=
+- 地理院タイル一覧（淡色地図・利用規約）: https://maps.gsi.go.jp/development/ichiran.html
 - 国土地理院 逆ジオコーダ: https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress
 - 国土数値情報 鉄道データ: https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-v3_1.html
 - 国土数値情報 鉄道区分コード: https://nlftp.mlit.go.jp/ksj/gml/codelist/RailwayClassCd.html

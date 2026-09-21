@@ -1,5 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
+	// 画面用の CSS / JS。/static/* はワーカーを通さず配信される
+	"assets": { "directory": "./public" },
 	"compatibility_date": "2026-08-22",
 	"d1_databases": [
 		{
@@ -15,7 +17,9 @@
 			"binding": "mitorek_images",
 			"bucket_name": "mitorek-images"
 		}
-	]
+	],
+	// 認証 (better-auth) が入るまでの固定利用者。users.id に合わせる。認証導入時に消す
+	"vars": { "DEV_USER_ID": "dev" }
 	// "compatibility_flags": [
 	//   "nodejs_compat"
 	// ],

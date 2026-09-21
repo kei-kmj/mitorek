@@ -76,6 +76,10 @@
 			}
 		},
 		{
+			"includes": ["src/pages/**", "src/components/**"],
+			"linter": { "rules": { "style": { "noJsxLiterals": "off" } } }
+		},
+		{
 			"assist": { "actions": { "source": { "useSortedKeys": "off" } } },
 			"includes": ["src/db/schema/**"],
 			"linter": {
