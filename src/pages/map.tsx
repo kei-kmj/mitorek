@@ -10,7 +10,12 @@ const RADIUS_OPTIONS = [1000, DEFAULT_RADIUS_M, 5000, 10_000, MAX_RADIUS_M];
 
 /** 地図: 全スポットを表示し、コレクション・未訪問で切り替える。地図クリックで近傍の未訪問を出す */
 export const MapPage = ({ collections }: { collections: Collection[] }) => (
-	<Layout leaflet={true} script="/static/map.js" title="地図">
+	<Layout
+		leaflet={true}
+		script="/static/map.js"
+		stylesheet="/static/map.css"
+		title="地図"
+	>
 		<main class="map-layout">
 			<aside class="panel">
 				<section>
@@ -38,13 +43,13 @@ export const MapPage = ({ collections }: { collections: Collection[] }) => (
 					</ul>
 					<label>
 						<input id="unvisited-only" type="checkbox" />
-						未訪問だけ表示
+						未踏だけ表示
 					</label>
 				</section>
 				<section>
-					<h2>近くの未訪問</h2>
+					<h2>近くの未踏</h2>
 					<p class="hint">
-						地図をクリックすると、その地点から半径内の未訪問スポットを直線距離で出します。
+						地図をクリックすると、その地点から半径内の未踏スポットを直線距離で出します。
 					</p>
 					<label>
 						半径

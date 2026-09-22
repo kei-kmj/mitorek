@@ -35,7 +35,7 @@ spotsApp.get(
 		{
 			query: NearbyQuery,
 			response: NearbySpot.array(),
-			summary: "近傍の未訪問スポット (直線距離)",
+			summary: "近傍の未踏スポット (直線距離)",
 			tags: ["spots"],
 		},
 		({ query: { center, radiusM }, db, userId }) =>

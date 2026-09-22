@@ -40,6 +40,10 @@ npm run db:restore:local  # ダンプから復元
 - リモート未適用の間は `migrations/0000_*.sql` を作り直してよい（`rm -rf migrations` →
   `db:generate`）。適用後は追加マイグレーションのみ
 - `scripts/` `seeds/` `data/` は git 管理外。手元にだけある
+- **テーブルを作り直すマイグレーション（CHECK の変更など）は、生成されたまま当てない。**
+  drizzle-kit の `PRAGMA foreign_keys=OFF` は D1 では効かず（`defer_foreign_keys` でも同じ）、
+  `DROP TABLE` が `ON DELETE CASCADE` で子の表を消す。子の表を退避して戻す形に手で直し、
+  `test/migrations.test.ts` の形で行が残ることを確かめてから当てる（例: `migrations/0001_*.sql`）
 
 ## キー設計
 

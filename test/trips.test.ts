@@ -87,6 +87,38 @@ describe("楽観ロックと期間の変更", () => {
 			"2026-10-11",
 		]);
 	});
+});
+
+describe("期間の変更と日", () => {
+	it("日数を変えずにずらすと、日ごと中身も動く (1 日目は 1 日目のまま)", async () => {
+		let trip = await addStops(await newTrip(), [
+			{ id: "castle", type: "spot" },
+		]);
+		// 10/10〜12 → 10/11〜13 (1 日ずらす。日付が重なる区間があっても動かせる)
+		trip = (
+			await call("PATCH", `/trips/${trip.id}`, {
+				endDate: "2026-10-13",
+				startDate: "2026-10-11",
+				updatedAt: trip.updatedAt,
+			})
+		).json;
+		expect(trip.days.map((d) => d.date)).toEqual([
+			"2026-10-11",
+			"2026-10-12",
+			"2026-10-13",
+		]);
+		expect(names(trip, 0)).toEqual(["姫路城"]);
+		// 別の月へ大きくずらしても同じ
+		trip = (
+			await call("PATCH", `/trips/${trip.id}`, {
+				endDate: "2026-11-03",
+				startDate: "2026-11-01",
+				updatedAt: trip.updatedAt,
+			})
+		).json;
+		expect(trip.days[0]?.date).toBe("2026-11-01");
+		expect(names(trip, 0)).toEqual(["姫路城"]);
+	});
 
 	it("期間を延ばすと日が増え、既存の日と中身は残る", async () => {
 		let trip = await addStops(await newTrip(), [

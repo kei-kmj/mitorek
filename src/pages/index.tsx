@@ -12,7 +12,10 @@ const pages = new Hono<Env>();
 /** GET / — ホーム */
 pages.get("/", async (c) =>
 	c.html(
-		<HomePage collections={await listCollections(c.var.db, c.var.userId)} />,
+		<HomePage
+			collections={await listCollections(c.var.db, c.var.userId)}
+			trips={await listTrips(c.var.db, c.var.userId)}
+		/>,
 	),
 );
 

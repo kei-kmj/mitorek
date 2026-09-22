@@ -1,0 +1,182 @@
+/* 地図の画面 (src/pages/map.tsx) だけで使う。色の変数は app.css */
+.map-layout {
+	display: grid;
+	grid-template-columns: 300px 1fr;
+	height: calc(100dvh - var(--header-h));
+}
+
+.panel {
+	padding: 12px 16px;
+	overflow-y: auto;
+	background: var(--panel);
+	border-right: 1px solid var(--border);
+}
+
+.panel h2 {
+	margin: 8px 0;
+	font-size: 1rem;
+}
+
+.collections,
+.nearby {
+	padding: 0;
+	margin: 0 0 12px;
+	list-style: none;
+}
+
+.collections label {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	padding: 3px 0;
+}
+
+.collections .count {
+	margin-left: auto;
+}
+
+.nearby button {
+	display: flex;
+	gap: 8px;
+	justify-content: space-between;
+	width: 100%;
+	padding: 6px 4px;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+	background: none;
+	border: 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.nearby button:hover {
+	background: var(--bg);
+}
+
+#map {
+	height: 100%;
+}
+
+.popup {
+	display: grid;
+	gap: 4px;
+	min-width: 180px;
+}
+
+/* 吹き出しの訪問欄 (map-visits.js) */
+.visit-box {
+	display: grid;
+	gap: 4px;
+	justify-items: start;
+	padding-top: 4px;
+	border-top: 1px solid var(--border);
+}
+
+.visit-list {
+	padding: 0;
+	margin: 0;
+	list-style: none;
+}
+
+.popup button.primary {
+	padding: 3px 14px;
+	font-weight: 600;
+	color: var(--on-accent);
+	background: var(--accent);
+	border: 1px solid var(--accent);
+	border-radius: 4px;
+}
+
+.popup button.link {
+	padding: 0 4px;
+	color: var(--accent);
+	background: none;
+	border: 0;
+}
+
+.popup .note {
+	white-space: pre-wrap;
+}
+
+.popup button {
+	margin-top: 4px;
+	cursor: pointer;
+}
+
+/* ピン: 絵文字だけ。白いふち取りの影で地図から浮かせる。訪問済みはグレーアウト */
+.pin {
+	display: grid;
+	place-items: center;
+	/* map.js の PIN_SIZE と揃える */
+	width: 40px;
+	height: 40px;
+	font-size: 34px;
+	line-height: 1;
+	filter: drop-shadow(0 0 1px rgb(255 255 255))
+		drop-shadow(0 0 2px rgb(255 255 255))
+		drop-shadow(0 1px 2px rgb(0 0 0 / 50%));
+}
+
+.pin.is-visited {
+	filter: grayscale(1) opacity(0.45) drop-shadow(0 0 1px rgb(255 255 255));
+}
+
+.nearby-head {
+	display: flex;
+	gap: 8px;
+	align-items: baseline;
+	justify-content: space-between;
+}
+
+.nearby-head button {
+	flex-shrink: 0;
+	padding: 2px 10px;
+	font: inherit;
+	font-size: 0.85em;
+	color: inherit;
+	cursor: pointer;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+}
+
+/* 地図上の × (円の右上のふち)。map.js の CLOSE_SIZE と揃える */
+.nearby-close {
+	display: grid;
+	place-items: center;
+	font-size: 18px;
+	font-weight: 700;
+	line-height: 1;
+	color: var(--accent);
+	cursor: pointer;
+	background: rgb(255 255 255);
+	border: 2px solid var(--accent);
+	border-radius: 50%;
+	box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
+}
+
+.nearby-circle {
+	fill: var(--accent);
+	fill-opacity: 0.08;
+	stroke: var(--accent);
+}
+
+@media (max-width: 720px) {
+	.map-layout {
+		grid-template-rows: 60dvh auto;
+		grid-template-columns: 1fr;
+		height: auto;
+	}
+
+	.panel {
+		order: 2;
+		border-top: 1px solid var(--border);
+		border-right: 0;
+	}
+
+	#map {
+		order: 1;
+		height: 60dvh;
+	}
+}

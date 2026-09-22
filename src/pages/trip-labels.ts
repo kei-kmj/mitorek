@@ -3,6 +3,7 @@ import type { TripSummary } from "../schemas/trips";
 /** 旅程の状態の表示名 (画面の script 側にも同じ表がある: public/static/trip-labels.js) */
 export const STATUS_LABEL: Record<TripSummary["status"], string> = {
 	cancelled: "中止",
+	completed: "終了",
 	confirmed: "確定",
 	planning: "計画中",
 	postponed: "延期",

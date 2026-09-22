@@ -7,6 +7,7 @@ const DATE_SLICE = 5;
 
 export const STATUS_LABEL = {
 	cancelled: "中止",
+	completed: "終了",
 	confirmed: "確定",
 	planning: "計画中",
 	postponed: "延期",

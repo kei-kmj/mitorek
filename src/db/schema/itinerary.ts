@@ -17,9 +17,11 @@ import { users } from "./users";
 // 旅程: trips → days → stops
 // ------------------------------------------------------------
 
+/** 人が決める状態。completed (終了) は旅を終えて振り返りも済んだときに人が選ぶ */
 export const tripStatuses = [
 	"planning",
 	"confirmed",
+	"completed",
 	"postponed",
 	"cancelled",
 ] as const;
@@ -37,7 +39,7 @@ export const trips = sqliteTable(
 		/** YYYY-MM-DD。延期中は NULL 可 */
 		startDate: text("start_date"),
 		endDate: text("end_date"),
-		/** 進行中・終了は日付から導出、行ったかは visits */
+		/** 人が決める状態。行ったかどうかは visits (振り返り・地図の「行った」) */
 		status: text("status", { enum: tripStatuses })
 			.notNull()
 			.default("planning"),

@@ -2,6 +2,7 @@
 import { el } from "./dom.js";
 import { formatDay, placeEmoji, STATUS_LABEL } from "./trip-labels.js";
 import { legRow } from "./trip-leg.js";
+import { hasStarted, reviewPanel } from "./trip-review.js";
 
 const field = (label, control) =>
 	el("label", { className: "field" }, label, control);
@@ -242,5 +243,7 @@ export const renderTrip = (root, trip, ctx) => {
 		headerForm(trip, ctx),
 		el("p", { className: "error", id: "trip-status" }),
 		...days,
+		// 旅が始まったら (日本時間で開始日以降)、行ったかの振り返りを出す
+		hasStarted(trip) && reviewPanel(trip, ctx),
 	);
 };

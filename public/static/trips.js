@@ -17,3 +17,11 @@ form.addEventListener("submit", async (e) => {
 	}
 	error.textContent = json.error?.message ?? `作れませんでした (${status})`;
 });
+
+// ホームの「新しいおでかけプランを作る」から来たら、すぐタイトルを入力できるようにする。
+// #new-trip へのスクロールの後でないとフォーカスが外れるので、読み込みが終わってから
+if (globalThis.location.hash === "#new-trip") {
+	globalThis.addEventListener("load", () => {
+		form.querySelector('input[name="title"]')?.focus();
+	});
+}

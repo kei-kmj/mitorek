@@ -1,7 +1,9 @@
 // 地図ページ (src/pages/map.tsx) の島。Leaflet は CDN から読み込み済みの前提
 import { el, formatKm, getJson } from "./dom.js";
 import { bindMapHash } from "./map-hash.js";
+import { spreadShifts, twinGroups } from "./map-spread.js";
 import { bindStations } from "./map-stations.js";
+import { visitSection } from "./map-visits.js";
 
 const { L } = globalThis;
 
@@ -29,7 +31,6 @@ const DIAGONAL = Math.SQRT1_2;
 const COORD_DIGITS = 6;
 const HTTP_URL = /^https?:\/\//u;
 const PIN_CLASS = { false: "pin is-unvisited", true: "pin is-visited" };
-const VISIT_LABEL = { false: "未訪問", true: "訪問済み" };
 
 const map = L.map("map", {
 	maxZoom: MAX_ZOOM,
@@ -82,13 +83,32 @@ const pinElement = (spot) =>
 		collections.get(spot.collectionId)?.emoji ?? "📍",
 	);
 
-const pinIcon = (spot) =>
-	L.divIcon({
+/** spot.id → 画面上のずらし量 [dx, dy] (px)。同じ場所の別スポットを横に並べるため (map-spread.js) */
+const shifts = new Map();
+
+const pinIcon = (spot) => {
+	const [dx, dy] = shifts.get(spot.id) ?? [0, 0];
+	return L.divIcon({
 		className: "",
 		html: pinElement(spot),
-		iconAnchor: [PIN_SIZE / 2, PIN_SIZE / 2],
+		// 基準点 (本来の位置) をずらすと、ピンは逆向きに動く
+		iconAnchor: [PIN_SIZE / 2 - dx, PIN_SIZE / 2 - dy],
 		iconSize: [PIN_SIZE, PIN_SIZE],
 	});
+};
+
+/** 表示中の、すぐ近くにあるスポットの組。ズームのたびに重なりを見て並べ直す */
+let twins = [];
+
+const spreadTwins = () => {
+	const changed = [...spreadShifts(map, twins, PIN_SIZE)].filter(
+		([id, [dx, dy]]) => String(shifts.get(id) ?? [0, 0]) !== String([dx, dy]),
+	);
+	for (const [id, shift] of changed) {
+		shifts.set(id, shift);
+		markers.get(id)?.setIcon(pinIcon(spots.find((s) => s.id === id)));
+	}
+};
 
 const popupOf = (spot) =>
 	el(
@@ -97,7 +117,9 @@ const popupOf = (spot) =>
 		el("strong", { textContent: spot.name }),
 		el("div", {
 			className: "meta",
-			textContent: `${collections.get(spot.collectionId)?.name ?? spot.collectionId} ・ ${VISIT_LABEL[spot.visited]}`,
+			// 訪問の状態は下の訪問欄 (map-visits.js) が出す
+			textContent:
+				collections.get(spot.collectionId)?.name ?? spot.collectionId,
 		}),
 		spot.reward && el("div", { textContent: `🎁 ${spot.reward}` }),
 		spot.note && el("div", { className: "note", textContent: spot.note }),
@@ -108,6 +130,7 @@ const popupOf = (spot) =>
 				target: "_blank",
 				textContent: "公式ページ",
 			}),
+		visitSection(spot, (visited) => updateVisited(spot, visited)),
 		el("button", {
 			// 起点のスポット自身は結果から外す (距離 0 で必ず先頭に出てしまう)
 			onclick: () =>
@@ -116,6 +139,27 @@ const popupOf = (spot) =>
 			type: "button",
 		}),
 	);
+
+/** サイドバーの「訪問済み / 全体」を、今のスポットの状態から数え直す */
+const updateCounts = () => {
+	for (const box of collectionBoxes) {
+		const mine = spots.filter((s) => s.collectionId === box.value);
+		const count = box.closest("label")?.querySelector(".count");
+		if (count) {
+			count.textContent = `${mine.filter((s) => s.visited).length} / ${mine.length}`;
+		}
+	}
+};
+
+/** 「行った」「取り消し」の結果をピン (グレーアウト) と件数に映す */
+const updateVisited = (spot, visited) => {
+	if (spot.visited === visited) {
+		return;
+	}
+	spot.visited = visited;
+	markers.get(spot.id)?.setIcon(pinIcon(spot));
+	updateCounts();
+};
 
 const selectedCollections = () =>
 	new Set(collectionBoxes.filter((b) => b.checked).map((b) => b.value));
@@ -137,6 +181,8 @@ const renderSpots = () => {
 		markers.set(spot.id, marker);
 		spotLayer.addLayer(marker);
 	}
+	twins = twinGroups(visible);
+	spreadTwins();
 };
 
 const focusSpot = (spot) => {
@@ -221,7 +267,7 @@ async function showNearby(latlng, { excludeId } = {}) {
 		if (seq !== searchSeq) {
 			return;
 		}
-		nearbyStatus.textContent = `半径 ${formatKm(radius)} (直線距離) に未訪問 ${found.length} 件`;
+		nearbyStatus.textContent = `半径 ${formatKm(radius)} (直線距離) に未踏 ${found.length} 件`;
 		nearbyList.replaceChildren(...found.map(nearbyItem));
 	} catch (error) {
 		if (seq === searchSeq) {
@@ -232,6 +278,7 @@ async function showNearby(latlng, { excludeId } = {}) {
 
 // ピンや駅のクリックは地図まで伝わらないので、ここに来るのは地図の空き地だけ
 map.on("click", (e) => showNearby(e.latlng));
+map.on("zoomend", spreadTwins);
 nearbyClear.addEventListener("click", clearNearby);
 for (const box of [...collectionBoxes, unvisitedOnly]) {
 	box.addEventListener("change", renderSpots);

@@ -242,3 +242,38 @@
 .address-search {
 	margin-top: 12px;
 }
+
+/* 振り返り (trip-review.js) */
+.review {
+	padding: 12px 0;
+	border-top: 2px solid var(--accent);
+}
+
+.review h2 {
+	margin: 0 0 4px;
+	font-size: 1.05rem;
+}
+
+.review-day h3 {
+	margin: 12px 0 4px;
+	font-size: 0.95rem;
+}
+
+.review-list {
+	padding: 0;
+	margin: 0 0 8px;
+	list-style: none;
+}
+
+.review-item {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	align-items: center;
+	padding: 6px 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.review-item.is-recorded .photos {
+	flex-basis: 100%;
+}

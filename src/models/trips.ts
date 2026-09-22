@@ -16,6 +16,7 @@ import { findDays } from "./trip-detail";
 import {
 	assertOwnTrip,
 	guard,
+	type Lock,
 	runLocked,
 	STALE_MESSAGE,
 	stmt,
@@ -59,6 +60,76 @@ const daysOutside = async (db: Db, tripId: string, dates: string[]) => {
 		existing: new Set(days.map((d) => d.date)),
 		removed: days.filter((d) => !keep.has(d.date)),
 	};
+};
+
+/**
+ * 旅程をずらした (日数は同じまま開始日が変わった) ときは、日ごと動かす。1 日目は 1 日目のまま中身も付いていく。
+ * UNIQUE(trip_id, date) に途中でぶつからないよう、一度仮の値にしてから新しい日付を入れる
+ */
+const shiftDays = (
+	db: Db,
+	days: { id: string }[],
+	dates: string[],
+	lock: Lock,
+): D1PreparedStatement[] => [
+	...days.map((d) =>
+		stmt(
+			db,
+			sql`UPDATE days SET date = ${`shift:${d.id}`} WHERE id = ${d.id} AND ${guard(lock)}`,
+		),
+	),
+	...days.map((d, i) =>
+		stmt(
+			db,
+			sql`UPDATE days SET date = ${dates[i]} WHERE id = ${d.id} AND ${guard(lock)}`,
+		),
+	),
+];
+
+/**
+ * 期間の変更で日を合わせる文。
+ * - 日数が同じで開始日が変わった (旅程をずらした): 日ごと動かす
+ * - 日数が変わった (延ばした・縮めた): 端で日を足し引きする。地点の入った日が外れるときは確認 (409) を求める
+ */
+const periodStatements = async (
+	db: Db,
+	{
+		current,
+		dates,
+		lock,
+		removeDaysWithStops,
+	}: {
+		current: TripRow;
+		dates: string[];
+		lock: Lock;
+		removeDaysWithStops: boolean;
+	},
+): Promise<D1PreparedStatement[]> => {
+	const days = await db.all<{ date: string; id: string }>(
+		sql`SELECT id, date FROM days WHERE trip_id = ${lock.tripId} ORDER BY date`,
+	);
+	const moved = current.startDate !== dates[0];
+	if (moved && days.length === dates.length) {
+		return shiftDays(db, days, dates, lock);
+	}
+	const { existing, removed } = await daysOutside(db, lock.tripId, dates);
+	const withStops = removed.filter((d) => d.stops > 0);
+	if (withStops.length > 0 && !removeDaysWithStops) {
+		throw new HTTPException(CONFLICT, {
+			message: `地点が入っている日が期間から外れます: ${withStops.map((d) => d.date).join(", ")}`,
+		});
+	}
+	return [
+		...insertDays(
+			db,
+			lock.tripId,
+			dates.filter((d) => !existing.has(d)),
+			guard(lock),
+		),
+		...removed.map((d) =>
+			stmt(db, sql`DELETE FROM days WHERE id = ${d.id} AND ${guard(lock)}`),
+		),
+	];
 };
 
 // ---- 一覧 (地図の「旅程に追加」で日を選ぶので、日も付ける) ----
@@ -158,24 +229,13 @@ export const updateTrip = async (
 	];
 	// 延期などで日付が無いときは、日はそのまま残す
 	if (next.startDate && next.endDate) {
-		const dates = datesBetween(next.startDate, next.endDate);
-		const { existing, removed } = await daysOutside(db, tripId, dates);
-		const withStops = removed.filter((d) => d.stops > 0);
-		if (withStops.length > 0 && !body.removeDaysWithStops) {
-			throw new HTTPException(CONFLICT, {
-				message: `地点が入っている日が期間から外れます: ${withStops.map((d) => d.date).join(", ")}`,
-			});
-		}
 		statements.push(
-			...insertDays(
-				db,
-				tripId,
-				dates.filter((d) => !existing.has(d)),
-				guard(lock),
-			),
-			...removed.map((d) =>
-				stmt(db, sql`DELETE FROM days WHERE id = ${d.id} AND ${guard(lock)}`),
-			),
+			...(await periodStatements(db, {
+				current,
+				dates: datesBetween(next.startDate, next.endDate),
+				lock,
+				removeDaysWithStops: body.removeDaysWithStops ?? false,
+			})),
 		);
 	}
 	await runLocked(db, lock, statements);
