@@ -18,7 +18,7 @@
     "db:restore:remote": "wrangler d1 execute mitorek --remote --file data/mitorek-data.sql"
   },
   "dependencies": {
-    "@scalar/hono-api-reference": "^0.12.2",
+    "@hono/swagger-ui": "^0.6.1",
     "arktype": "^2.2.3",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.8",

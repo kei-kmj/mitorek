@@ -50,6 +50,8 @@ describe("訪問の写真", () => {
 
 	it("JPEG 以外は 400、他人の訪問には足せない (404)", async () => {
 		const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+		// image/jpeg と名乗らせる。宣言された種類は見ず、中身のバイトで判定すること
+		expect((await upload(visit.id, png, "image/jpeg")).status).toBe(400);
 		expect((await upload(visit.id, png, "image/png")).status).toBe(400);
 		await createDb(env.mitorek_db)
 			.insert(visits)

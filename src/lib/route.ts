@@ -13,24 +13,27 @@ import { BAD_REQUEST, type CREATED, OK } from "./http";
 /** スキーマ未指定なら undefined、指定ありなら検証・変換後 (morph 適用後) の型 */
 type Out<S> = S extends Type ? S["infer"] : undefined;
 
-interface Opts<Q, P, B> {
-	/**
-	 * 応答が JSON でなく画像などのときの MIME (image/jpeg)。
-	 * ハンドラは Response を返し、route はそれをそのまま返す
-	 */
-	binary?: string;
+/**
+ * 応答は JSON かバイナリのどちらか一方。両方指定・どちらも無しは型で防ぐ。
+ * binary のときハンドラは Response を返し、route はそれをそのまま返す
+ */
+type ResponseKind =
+	| { binary: string; response?: never }
+	| { binary?: never; response: Type };
+
+interface OptsBase<Q, P, B> {
 	body?: B;
 	/** 本文の形。既定 json。ファイルを受けるときは form (multipart/form-data) */
 	bodyFormat?: "json" | "form";
 	param?: P;
 	query?: Q;
-	/** JSON の応答の形。binary のときは要らない */
-	response?: Type;
 	/** 既定 200。作成系は 201 */
 	status?: typeof OK | typeof CREATED;
 	summary: string;
 	tags?: string[];
 }
+
+type Opts<Q, P, B> = OptsBase<Q, P, B> & ResponseKind;
 
 type Handler = MiddlewareHandler<Env>;
 
@@ -61,15 +64,11 @@ const validatorOr = (
 	});
 };
 
-/** OpenAPI に載せる応答の形。画像などは binary の MIME で、JSON はスキーマから */
-const responseContent = (o: {
-	binary?: string;
-	response?: Type;
-}): ContentWithResolver => {
-	if (o.binary) {
-		return { [o.binary]: { schema: { format: "binary", type: "string" } } };
+const responseContent = (kind: ResponseKind): ContentWithResolver => {
+	if (kind.binary === undefined) {
+		return { "application/json": { schema: resolver(kind.response) } };
 	}
-	return { "application/json": { schema: resolver(o.response as Type) } };
+	return { [kind.binary]: { schema: { format: "binary", type: "string" } } };
 };
 
 /** ハンドラに注入されるもの。FastAPI の Depends() 相当 */

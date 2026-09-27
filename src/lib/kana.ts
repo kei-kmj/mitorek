@@ -1,33 +1,31 @@
 /**
- * 検索の表記ゆれを吸収する。ひらがな・カタカナは同じとみなし、長音「ー」・空白・中黒「・」は無視する。
- * SQL 側 (squashSql) と同じ文字を落とすこと
+ * 検索の表記ゆれを吸収する。ひらがな・カタカナは同じとみなし、長音「ー」・空白・中黒「・」は無視する
  */
 
 /** ぁ (U+3041) 〜 ゖ (U+3096) とカタカナ ァ 〜 ヶ の差 */
 const KANA_OFFSET = 0x60;
 const HIRAGANA = /[ぁ-ゖ]/gu;
 const KATAKANA = /[ァ-ヶ]/gu;
-/** 無視する文字: 長音・半角/全角空白・中黒 */
-const IGNORED = /[ー\s　・]/gu;
 
-const shift = (c: string, delta: number) =>
-	String.fromCodePoint((c.codePointAt(0) ?? 0) + delta);
+/** SQL 側 (models/places.ts の squashSql) が replace で落とす文字。ここが唯一の出どころ */
+const IGNORED_CHARS = ["ー", " ", "　", "・"] as const;
 
-/** squashSql で落とす文字 (IGNORED と揃える) */
-export const IGNORED_CHARS = ["ー", " ", "　", "・"] as const;
+const IGNORED = new RegExp(`[${IGNORED_CHARS.join("")}\\s]`, "gu");
 
-export const toKatakana = (s: string) =>
-	s.replaceAll(HIRAGANA, (c) => shift(c, KANA_OFFSET));
+const shift = (char: string, delta: number) =>
+	String.fromCodePoint((char.codePointAt(0) ?? 0) + delta);
 
-export const toHiragana = (s: string) =>
-	s.replaceAll(KATAKANA, (c) => shift(c, -KANA_OFFSET));
+export const toKatakana = (s: string): string =>
+	s.replaceAll(HIRAGANA, (char) => shift(char, KANA_OFFSET));
 
-/** 無視する文字を落とす */
-export const squash = (s: string) => s.replaceAll(IGNORED, "");
+export const toHiragana = (s: string): string =>
+	s.replaceAll(KATAKANA, (char) => shift(char, -KANA_OFFSET));
+
+export const squash = (s: string): string => s.replaceAll(IGNORED, "");
 
 /**
- * 検索語の変形: 無視する文字を落とし、カタカナ版とひらがな版を作る (同じなら 1 つ)。
- * 名前 (カタカナが多い) にもふりがな (ひらがな) にも当たるように
+ * 名前 (カタカナが多い) にもふりがな (ひらがな) にも当たるよう、両方の版で探す。
+ * 同じものになれば 1 つ
  */
 export const queryVariants = (q: string): string[] => {
 	const base = squash(q);
@@ -35,3 +33,5 @@ export const queryVariants = (q: string): string[] => {
 		(v) => v.length > 0,
 	);
 };
+
+export { IGNORED_CHARS };

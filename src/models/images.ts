@@ -3,8 +3,8 @@ import { HTTPException } from "hono/http-exception";
 import { ulid } from "ulidx";
 import type { Db } from "../db/client";
 import type { UserId } from "../env";
-import { isJpeg, stripJpegMetadata } from "../lib/exif";
 import { BAD_REQUEST, NOT_FOUND } from "../lib/http";
+import { isJpeg, stripJpegMetadata } from "../lib/jpeg-metadata";
 import {
 	type ImageUploadBody,
 	MAX_IMAGE_BYTES,

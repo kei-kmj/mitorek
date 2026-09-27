@@ -1,10 +1,18 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "../src/db/client";
+import { trips } from "../src/db/schema/itinerary";
 import { visits } from "../src/db/schema/visits";
 import type { ReviewItem } from "../src/schemas/review";
 import type { TripDetail } from "../src/schemas/trips";
-import { addStops, call, ME, newTrip, seedTripFixture } from "./trip-helpers";
+import {
+	addStops,
+	call,
+	ME,
+	newTrip,
+	OTHER,
+	seedTripFixture,
+} from "./trip-helpers";
 
 let trip: TripDetail;
 
@@ -61,7 +69,18 @@ describe("振り返り", () => {
 		expect((await confirm([item?.stopId ?? ""]))[0]?.visits).toHaveLength(1);
 	});
 
-	it("他人のおでかけプランは 404", async () => {
+	it("他人のおでかけプラン・無いプランは 404 (読みも確定も)", async () => {
+		await createDb(env.mitorek_db).insert(trips).values({
+			endDate: "2026-10-10",
+			id: "others-trip",
+			startDate: "2026-10-10",
+			title: "他人",
+			userId: OTHER,
+		});
+		expect((await call("GET", "/trips/others-trip/review")).status).toBe(404);
+		expect(
+			(await call("POST", "/trips/others-trip/review", { stopIds: [] })).status,
+		).toBe(404);
 		expect((await call("GET", "/trips/missing/review")).status).toBe(404);
 	});
 });

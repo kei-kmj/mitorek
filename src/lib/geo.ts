@@ -18,3 +18,5 @@ export const bboxAround = (center: GeoPoint, radiusM: number): BoundingBox => {
 		west: center.lng - dLng,
 	};
 };
+
+export { EARTH_RADIUS_M };

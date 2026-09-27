@@ -61,19 +61,30 @@ const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
 /** 県コード (JP-13) → 県名。Nominatim は東京都などで province を返さないので、コードから引く */
 type PrefectureName = (code: string) => string | undefined;
 
+/** 東京都などは province が返らないので、そのときだけ県コードから引く */
+const prefectureOf = (
+	address: NominatimAddress | undefined,
+	prefectureName: PrefectureName,
+): string | undefined => {
+	if (address?.province !== undefined) {
+		return address.province;
+	}
+	const code = address?.["ISO3166-2-lvl4"];
+	if (code === undefined) {
+		return undefined;
+	}
+	return prefectureName(code);
+};
+
 /**
- * 補足は「県 + 市区町村 + 町名・丁目 (+ 番地)」(東京都新宿区歌舞伎町二丁目 5)。
- * 同じ区に同名チェーンのホテルが複数あっても見分けられるよう、分かる範囲で細かくする。郵便番号は要らない
+ * 同じ区に同名チェーンのホテルが複数あっても見分けられるよう、分かる範囲で細かくする
+ * (東京都新宿区歌舞伎町二丁目 5)。郵便番号は要らない
  */
 const shortAddress = (
 	address: NominatimAddress | undefined,
 	prefectureName: PrefectureName,
 ): string | null => {
-	const code = address?.["ISO3166-2-lvl4"];
-	let prefecture = address?.province;
-	if (prefecture === undefined && code !== undefined) {
-		prefecture = prefectureName(code);
-	}
+	const prefecture = prefectureOf(address, prefectureName);
 	const city = address?.city ?? address?.town ?? address?.village;
 	const area = address?.neighbourhood ?? address?.quarter ?? address?.suburb;
 	const text = `${prefecture ?? ""}${city ?? ""}${area ?? ""}`;
@@ -87,12 +98,11 @@ const shortAddress = (
 };
 
 /**
- * name:ja がブランド名そのものなら元の名前を、そうでなければ name:ja を使う。
- * accept-language=ja だと name は name:ja になり、チェーン店ではそれがブランド名 (アパホテル) だけのことがある。
- * そのときは支店まで入っていることの多い元の名前 (アパホテル 銀座 宝町) を使う。
+ * accept-language=ja だと name は name:ja になり、チェーン店ではブランド名 (アパホテル) だけのことがある。
+ * そのときは支店まで入っていることの多い元の名前 (アパホテル 銀座 宝町) の方が役に立つ。
  * name:ja の方が詳しい施設 (アパホテル神保町) もあるので、ブランド名と同じときだけ置き換える
  */
-const baseName = (p: NominatimPlace): string => {
+const preferredName = (p: NominatimPlace): string => {
 	const japanese = p.name || p.display_name;
 	const original = p.namedetails?.name;
 	if (original && p.namedetails?.brand === japanese) {
@@ -101,17 +111,26 @@ const baseName = (p: NominatimPlace): string => {
 	return japanese;
 };
 
-/**
- * 施設名を名前に、住所を補足にする。チェーン店は支店名を名前に続ける (アパホテル 新宿歌舞伎町中央)。
- * 名前が無い結果は住所全体を名前にする
- */
+/** チェーン店は支店名を名前に続ける (アパホテル 新宿歌舞伎町中央) */
 const placeName = (p: NominatimPlace): string => {
-	const name = baseName(p);
+	const name = preferredName(p);
 	const branch = p.extratags?.branch;
 	if (branch && !name.includes(branch)) {
 		return `${name} ${branch}`;
 	}
 	return name;
+};
+
+/** 片方が落ちても、もう片方の候補は返す。両方無いより役に立つため */
+const candidatesOrLogged = (
+	settled: PromiseSettledResult<GeocodeResult[]>,
+): GeocodeResult[] => {
+	if (settled.status === "fulfilled") {
+		return settled.value;
+	}
+	// biome-ignore lint/suspicious/noConsole: 失敗は Workers のログにだけ残す
+	console.error(settled.reason);
+	return [];
 };
 
 export const parseGsi = (features: GsiFeature[]): GeocodeResult[] =>
@@ -136,10 +155,7 @@ export const parseNominatim = (
 		source: "osm",
 	}));
 
-/**
- * 住所 (国土地理院) と施設名 (Nominatim) を同時に探し、施設名の候補を先に並べる。
- * 片方が失敗しても、もう片方の結果は返す
- */
+/** 住所 (国土地理院) と施設名 (Nominatim) を同時に探し、施設名の候補を先に並べる */
 export const geocode = async (
 	q: string,
 	prefectureName: PrefectureName,
@@ -152,13 +168,5 @@ export const geocode = async (
 		).then((places) => parseNominatim(places, prefectureName)),
 		fetchJson<GsiFeature[]>(`${GSI}?q=${query}`).then(parseGsi),
 	]);
-	const ok = (r: PromiseSettledResult<GeocodeResult[]>) => {
-		if (r.status === "fulfilled") {
-			return r.value;
-		}
-		// biome-ignore lint/suspicious/noConsole: 片方の失敗は Workers のログにだけ残す
-		console.error(r.reason);
-		return [];
-	};
-	return [...ok(osm), ...ok(gsi)];
+	return [...candidatesOrLogged(osm), ...candidatesOrLogged(gsi)];
 };

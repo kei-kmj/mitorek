@@ -45,6 +45,7 @@
 ### F2 訪問記録
 - スポット単位で記録（同じスポットに複数回可）
 - 過去分の一括登録（日付不明を許す）
+- `visits.visited_at` は ISO 8601。地図の「行った」は押した時刻 (UTC の日時)、旅の後の振り返りは日付だけ (YYYY-MM-DD)、過去分で不明なら NULL。表示では日付だけのものは日付として出す
 - 訪問時の GPS は `visits.lat/lng` に保存。自分のマスタ座標の上書きに使う。他利用者の実測を共有マスタに集める仕組み（`spot_gps_samples`、同意付き）は公開時に追加
 - 訪問写真は `visit_images`（R2 キー・キャプション・順序。EXIF 除去済み）
 - テーブル: `visits`, `visit_images`
@@ -110,7 +111,7 @@
 - 日時：`*_at` は UTC の ISO 8601（D1 の `datetime('now')`）、表示で JST。`days.date`（YYYY-MM-DD）と `HH:MM` は現地の暦日・時刻でタイムゾーンを持たない
 - ID：ULID を Worker 側で生成（`ulidx` 等）
 - エラー：`app.onError` で `{ error: { code, message } }`。検証（ArkType の失敗）400 / 認可 403 / 他人の資源・不存在は 404（存在を漏らさない）
-- 画像：EXIF 除去は Worker 内で JPEG の APP1 を落とす（`lib/exif.ts`）。除去後に R2 へ
+- 画像：EXIF 除去は Worker 内で JPEG の APP1（Exif / XMP）と APP13（IPTC）を落とす（`lib/jpeg-metadata.ts`）。除去後に R2 へ
 - 秘密情報：`wrangler secret put`。バックアップは `wrangler d1 export` を当面手動
 
 ## ディレクトリ構成（確定）
@@ -166,6 +167,7 @@ URL 設計は API 節（`/api/...`）と画面（`/`（ホーム: 到達状況�
 - 高速道路：`expressways` / `expressway_ics` を別表で追加し、`stops.ic_id`（NULL 可 FK、`station_id` と排他）と `spot_ics`（最寄り IC）を足す。`stations` は駅専用のまま変えない
 - 記事：`posts` を追加し、写真は `visit_images` を参照
 - 購読・共有・他利用者実測：`collection_subscriptions` / `trip_members` / `spot_gps_samples` を追加。既存表の変更なし
+- カレンダー連携：おでかけプランを Google カレンダー等に出す。案は (1) 購読用の iCalendar (ICS) URL を配る（OAuth 不要。Google 側の反映は数時間遅れる。URL が秘密そのものなので推測できないトークンにし、再発行できるようにする）か、(2) Google Calendar API で書き込む（F8 の Google 認証にカレンダー権限を足す。反映は即時）。どちらも未来の行動なので本人以外に出さない。表は `calendar_feeds(user_id, token, ...)` などを足す
 - 導出できる列は持たない：`links.user_id`（trips 経由）、`legs.day_id`（stops 経由）、`stations.country_code`（prefectures 経由）、`regions.game_id`（県→地方はゲームに依らない）
 
 ## 未決事項

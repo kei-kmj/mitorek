@@ -1,4 +1,4 @@
-import { Scalar } from "@scalar/hono-api-reference";
+import { swaggerUI } from "@hono/swagger-ui";
 import { Hono } from "hono";
 import { openAPIRouteHandler } from "hono-openapi";
 import type { Env } from "../env";
@@ -33,6 +33,6 @@ api.get(
 		},
 	}),
 );
-api.get("/docs", Scalar({ url: "/api/openapi.json" }));
+api.get("/docs", swaggerUI({ url: "/api/openapi.json" }));
 
 export { api };

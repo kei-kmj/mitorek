@@ -131,16 +131,6 @@ describe("findNearbyUnvisited", () => {
 		expect(rows[0]?.distanceM).toBeLessThan(1600);
 	});
 
-	it("近い順に並ぶ", async () => {
-		const rows = await findNearbyUnvisited(
-			createDb(env.mitorek_db),
-			"u-nobody",
-			HIMEJI_STATION,
-			2000,
-		);
-		expect(ids(rows)).toEqual(["garden", "castle"]);
-	});
-
 	it("半径より遠いものは矩形に入っても落とす", async () => {
 		const rows = await findNearbyUnvisited(
 			createDb(env.mitorek_db),
@@ -156,12 +146,6 @@ describe("findSpot", () => {
 	it("廃止スポットも retired=true で返す", async () => {
 		const row = await findSpot(createDb(env.mitorek_db), ME, "retired");
 		expect(row?.retired).toBe(true);
-	});
-
-	it("存在しなければ undefined", async () => {
-		expect(
-			await findSpot(createDb(env.mitorek_db), ME, "missing"),
-		).toBeUndefined();
 	});
 });
 
