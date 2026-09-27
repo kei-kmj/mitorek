@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isJpeg, stripJpegMetadata } from "../src/lib/jpeg-metadata";
+import { isJpeg, stripJpegMetadata } from "../../src/lib/jpeg-metadata";
 
 /** マーカーと中身から、長さの欄を持つセグメントを作る (長さは中身 + 2) */
 const lengthPrefixed = (marker: number, body: number[]) => [
@@ -31,7 +31,7 @@ const SCAN = [0xff, 0xda, 0x00, 0x02, 0x11, 0x22, 0xff, 0x00, 0x33, 0xff, 0xd9];
 
 const jpeg = (...parts: number[][]) => new Uint8Array(parts.flat());
 
-describe("JPEG のメタデータ除去", () => {
+describe("stripJpegMetadata", () => {
 	it("APP1 と APP13 だけを落とし、長さの欄を持たないマーカーも画像本体もそのまま残す", () => {
 		const input = jpeg(
 			SOI,
@@ -56,12 +56,21 @@ describe("JPEG のメタデータ除去", () => {
 		expect([...stripJpegMetadata(input)]).toEqual([...input]);
 	});
 
-	it("JPEG でないもの・途中で切れたものは例外にする", () => {
-		const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
-		expect(isJpeg(png)).toBe(false);
-		expect(() => stripJpegMetadata(png)).toThrow();
-		// 長さの欄が中身より長い / 長さの欄そのものが足りない
-		expect(() => stripJpegMetadata(jpeg(SOI, APP1_EXIF.slice(0, 6)))).toThrow();
-		expect(() => stripJpegMetadata(jpeg(SOI, APP1_EXIF.slice(0, 3)))).toThrow();
+	it.each([
+		["JPEG でない", [0x89, 0x50, 0x4e, 0x47]],
+		["長さの欄が中身より長い", [...SOI, ...APP1_EXIF.slice(0, 6)]],
+		["長さの欄そのものが足りない", [...SOI, ...APP1_EXIF.slice(0, 3)]],
+	])("%s ものは例外にする", (_, bytes) => {
+		expect(() => stripJpegMetadata(new Uint8Array(bytes))).toThrow();
+	});
+});
+
+describe("isJpeg", () => {
+	it.each([
+		["JPEG", [...SOI, ...SCAN], true],
+		["PNG", [0x89, 0x50, 0x4e, 0x47], false],
+		["空", [], false],
+	])("%s → %s", (_, bytes, expected) => {
+		expect(isJpeg(new Uint8Array(bytes))).toBe(expected);
 	});
 });

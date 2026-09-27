@@ -43,6 +43,8 @@
 			"preset": "all",
 			"security": { "noSecrets": "off" },
 			"style": {
+				"noTernary": "off",
+				"useExportsLast": "off",
 				"useNamingConvention": {
 					"level": "on",
 					"options": {
@@ -78,6 +80,10 @@
 		{
 			"includes": ["src/pages/**", "src/components/**"],
 			"linter": { "rules": { "style": { "noJsxLiterals": "off" } } }
+		},
+		{
+			"includes": ["**/*.d.ts"],
+			"linter": { "rules": { "style": { "noNamespace": "off" } } }
 		},
 		{
 			"assist": { "actions": { "source": { "useSortedKeys": "off" } } },

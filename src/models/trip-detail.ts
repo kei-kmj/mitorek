@@ -1,7 +1,10 @@
-import { sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
+import { customPlaces, days, legs, stops } from "../db/schema/itinerary";
+import { spots } from "../db/schema/master";
+import { stations } from "../db/schema/rail";
 import type { UserId } from "../env";
-import type { Day, Leg, Place, Stop } from "../schemas/trips";
+import type { Day, Place, Stop } from "../schemas/trips";
 
 interface StopRow {
 	approachMemo: string | null;
@@ -19,6 +22,56 @@ interface StopRow {
 	type: Place["type"];
 }
 
+/** 旅程の立ち寄り (地点の名前・座標付き)。custom_places は自分のものだけ */
+const stopsOf = (db: Db, userId: UserId, tripId: string): Promise<StopRow[]> =>
+	db
+		.select({
+			approachMemo: stops.approachMemo,
+			arriveTime: stops.arriveTime,
+			collectionId: spots.collectionId,
+			dayId: stops.dayId,
+			departTime: stops.departTime,
+			id: stops.id,
+			kind: customPlaces.kind,
+			lat: sql<number>`COALESCE(${spots.lat}, ${stations.lat}, ${customPlaces.lat})`,
+			lng: sql<number>`COALESCE(${spots.lng}, ${stations.lng}, ${customPlaces.lng})`,
+			memo: stops.memo,
+			name: sql<string>`COALESCE(${spots.name}, ${stations.name}, ${customPlaces.name})`,
+			placeId: sql<string>`COALESCE(${stops.spotId}, ${stops.stationId}, ${stops.customPlaceId})`,
+			type: sql<Place["type"]>`CASE WHEN ${stops.spotId} IS NOT NULL THEN 'spot'
+        WHEN ${stops.stationId} IS NOT NULL THEN 'station' ELSE 'custom' END`,
+		})
+		.from(stops)
+		.innerJoin(days, eq(days.id, stops.dayId))
+		.leftJoin(spots, eq(spots.id, stops.spotId))
+		.leftJoin(stations, eq(stations.id, stops.stationId))
+		.leftJoin(
+			customPlaces,
+			and(
+				eq(customPlaces.id, stops.customPlaceId),
+				eq(customPlaces.userId, userId),
+			),
+		)
+		.where(eq(days.tripId, tripId))
+		.orderBy(asc(stops.seq));
+
+/** 旅程の移動 (出発の立ち寄りで引く) */
+const legsOf = (db: Db, tripId: string) =>
+	db
+		.select({
+			arriveTime: legs.arriveTime,
+			departTime: legs.departTime,
+			fromStopId: legs.fromStopId,
+			id: legs.id,
+			memo: legs.memo,
+			mode: legs.mode,
+			url: legs.url,
+		})
+		.from(legs)
+		.innerJoin(stops, eq(stops.id, legs.fromStopId))
+		.innerJoin(days, eq(days.id, stops.dayId))
+		.where(eq(days.tripId, tripId));
+
 /**
  * 旅程の日と、日ごとの立ち寄り (地点付き)・移動を組み立てる。
  * 呼び出し側で旅程が自分のものか確かめてから呼ぶ (custom_places は念のため user_id でも絞る)
@@ -28,33 +81,15 @@ export const findDays = async (
 	userId: UserId,
 	tripId: string,
 ): Promise<Day[]> => {
-	const days = await db.all<Omit<Day, "stops">>(
-		sql`SELECT id, date, memo FROM days WHERE trip_id = ${tripId} ORDER BY date`,
-	);
-	const stops = await db.all<StopRow>(sql`
-    SELECT st.id, st.day_id AS dayId, st.arrive_time AS arriveTime, st.depart_time AS departTime,
-      st.approach_memo AS approachMemo, st.memo,
-      CASE WHEN st.spot_id IS NOT NULL THEN 'spot'
-           WHEN st.station_id IS NOT NULL THEN 'station' ELSE 'custom' END AS type,
-      COALESCE(st.spot_id, st.station_id, st.custom_place_id) AS placeId,
-      COALESCE(sp.name, sn.name, cp.name) AS name,
-      COALESCE(sp.lat, sn.lat, cp.lat) AS lat,
-      COALESCE(sp.lng, sn.lng, cp.lng) AS lng,
-      sp.collection_id AS collectionId, cp.kind
-    FROM stops st
-    JOIN days d ON d.id = st.day_id
-    LEFT JOIN spots sp ON sp.id = st.spot_id
-    LEFT JOIN stations sn ON sn.id = st.station_id
-    LEFT JOIN custom_places cp ON cp.id = st.custom_place_id AND cp.user_id = ${userId}
-    WHERE d.trip_id = ${tripId}
-    ORDER BY st.seq`);
-	const legs = await db.all<Leg & { fromStopId: string }>(sql`
-    SELECT l.id, l.from_stop_id AS fromStopId, l.mode, l.depart_time AS departTime,
-      l.arrive_time AS arriveTime, l.url, l.memo
-    FROM legs l JOIN stops st ON st.id = l.from_stop_id JOIN days d ON d.id = st.day_id
-    WHERE d.trip_id = ${tripId}`);
+	const dayRows = await db
+		.select({ date: days.date, id: days.id, memo: days.memo })
+		.from(days)
+		.where(eq(days.tripId, tripId))
+		.orderBy(asc(days.date));
+	const stopRows = await stopsOf(db, userId, tripId);
+	const legRows = await legsOf(db, tripId);
 	const legByFrom = new Map(
-		legs.map(({ fromStopId, ...leg }) => [fromStopId, leg]),
+		legRows.map(({ fromStopId, ...leg }) => [fromStopId, leg]),
 	);
 
 	const toStop = (r: StopRow): Stop => ({
@@ -74,8 +109,8 @@ export const findDays = async (
 			type: r.type,
 		},
 	});
-	return days.map((day) => ({
+	return dayRows.map((day) => ({
 		...day,
-		stops: stops.filter((s) => s.dayId === day.id).map(toStop),
+		stops: stopRows.filter((s) => s.dayId === day.id).map(toStop),
 	}));
 };

@@ -1,16 +1,23 @@
-import { sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { ulid } from "ulidx";
 import type { Db } from "../db/client";
+import { spots } from "../db/schema/master";
+import { visitImages, visits } from "../db/schema/visits";
 import type { UserId } from "../env";
 import { NOT_FOUND } from "../lib/http";
 import type { Visit, VisitCreateBody } from "../schemas/visits";
 import { imagesOfVisits } from "./images";
 
-const visitColumns = sql`id, spot_id AS spotId, visited_at AS visitedAt, lat, lng, memo,
-  created_at AS createdAt`;
-
-type VisitRow = Omit<Visit, "images">;
+const visitColumns = {
+	createdAt: visits.createdAt,
+	id: visits.id,
+	lat: visits.lat,
+	lng: visits.lng,
+	memo: visits.memo,
+	spotId: visits.spotId,
+	visitedAt: visits.visitedAt,
+};
 
 /** そのスポットへの自分の訪問 (新しい順)。日付不明 (null) は最後。写真を添える */
 export const listVisits = async (
@@ -18,10 +25,15 @@ export const listVisits = async (
 	userId: UserId,
 	spotId: string,
 ): Promise<Visit[]> => {
-	const rows = await db.all<VisitRow>(sql`
-    SELECT ${visitColumns} FROM visits
-    WHERE user_id = ${userId} AND spot_id = ${spotId}
-    ORDER BY visited_at IS NULL, visited_at DESC, created_at DESC`);
+	const rows = await db
+		.select(visitColumns)
+		.from(visits)
+		.where(and(eq(visits.userId, userId), eq(visits.spotId, spotId)))
+		.orderBy(
+			sql`${visits.visitedAt} IS NULL`,
+			desc(visits.visitedAt),
+			desc(visits.createdAt),
+		);
 	const images = await imagesOfVisits(
 		db,
 		rows.map((r) => r.id),
@@ -35,19 +47,27 @@ export const createVisit = async (
 	userId: UserId,
 	body: VisitCreateBody,
 ): Promise<Visit> => {
-	const spot = await db.get(
-		sql`SELECT id FROM spots WHERE id = ${body.spotId} AND retired_at IS NULL`,
-	);
+	const spot = await db
+		.select({ id: spots.id })
+		.from(spots)
+		.where(and(eq(spots.id, body.spotId), isNull(spots.retiredAt)))
+		.get();
 	if (!spot) {
 		throw new HTTPException(NOT_FOUND, { message: "spot not found" });
 	}
-	const id = ulid();
-	const row = await db.get<VisitRow>(sql`
-    INSERT INTO visits (id, user_id, spot_id, visited_at, lat, lng)
-    VALUES (${id}, ${userId}, ${body.spotId}, ${new Date().toISOString()},
-      ${body.lat ?? null}, ${body.lng ?? null})
-    RETURNING ${visitColumns}`);
-	return { ...(row as VisitRow), images: [] };
+	const row = await db
+		.insert(visits)
+		.values({
+			id: ulid(),
+			lat: body.lat ?? null,
+			lng: body.lng ?? null,
+			spotId: body.spotId,
+			userId,
+			visitedAt: new Date().toISOString(),
+		})
+		.returning(visitColumns)
+		.get();
+	return { ...row, images: [] };
 };
 
 /**
@@ -59,15 +79,17 @@ export const deleteVisit = async (
 	userId: UserId,
 	{ bucket, visitId }: { bucket: R2Bucket; visitId: string },
 ): Promise<{ id: string }> => {
-	const keys = await db.all<{ key: string }>(sql`
-    SELECT i.r2_key AS key FROM visit_images i JOIN visits v ON v.id = i.visit_id
-    WHERE v.id = ${visitId} AND v.user_id = ${userId}`);
+	const keys = await db
+		.select({ key: visitImages.r2Key })
+		.from(visitImages)
+		.innerJoin(visits, eq(visits.id, visitImages.visitId))
+		.where(and(eq(visits.id, visitId), eq(visits.userId, userId)));
 	if (keys.length > 0) {
 		await bucket.delete(keys.map((k) => k.key));
 	}
-	const result = await db.run(
-		sql`DELETE FROM visits WHERE id = ${visitId} AND user_id = ${userId}`,
-	);
+	const result = await db
+		.delete(visits)
+		.where(and(eq(visits.id, visitId), eq(visits.userId, userId)));
 	if (result.meta.changes === 0) {
 		throw new HTTPException(NOT_FOUND, { message: "visit not found" });
 	}

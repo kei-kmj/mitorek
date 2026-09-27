@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { iconEmoji } from "../src/lib/emoji";
+import { iconEmoji } from "../../src/lib/emoji";
 
-describe("コレクションのアイコン", () => {
-	it("コードポイントの 16 進を絵文字に戻し、未設定は 📍", () => {
-		expect(iconEmoji("1f3ef")).toBe("🏯");
-		expect(iconEmoji(null)).toBe("📍");
+describe("iconEmoji", () => {
+	it.each([
+		["1f3ef", "🏯"],
+		[null, "📍"],
+	])("%s は %s", (code, emoji) => {
+		expect(iconEmoji(code)).toBe(emoji);
 	});
 
 	it("'-' で繋いだものは 1 つの絵文字に合成する (異体字セレクタ付き)", () => {

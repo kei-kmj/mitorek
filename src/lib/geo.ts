@@ -1,6 +1,6 @@
 import type { BoundingBox, GeoPoint } from "../schemas/geo";
 
-const EARTH_RADIUS_M = 6_371_000;
+export const EARTH_RADIUS_M = 6_371_000;
 const HALF_TURN_DEG = 180;
 const DEG_PER_RAD = HALF_TURN_DEG / Math.PI;
 
@@ -18,5 +18,3 @@ export const bboxAround = (center: GeoPoint, radiusM: number): BoundingBox => {
 		west: center.lng - dLng,
 	};
 };
-
-export { EARTH_RADIUS_M };

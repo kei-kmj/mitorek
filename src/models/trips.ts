@@ -1,7 +1,9 @@
-import { sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import { ulid } from "ulidx";
 import type { Db } from "../db/client";
+import { days, stops, trips } from "../db/schema/itinerary";
 import type { UserId } from "../env";
 import { datesBetween, periodProblem } from "../lib/dates";
 import { BAD_REQUEST, CONFLICT, NOT_FOUND } from "../lib/http";
@@ -13,52 +15,47 @@ import {
 	type TripUpdateBody,
 } from "../schemas/trips";
 import { findDays } from "./trip-detail";
-import {
-	assertOwnTrip,
-	guard,
-	type Lock,
-	runLocked,
-	STALE_MESSAGE,
-	stmt,
-} from "./trip-lock";
+import { assertOwnTrip, runLocked, STALE_MESSAGE } from "./trip-lock";
 
 type TripRow = Omit<TripDetail, "days">;
 
-const tripColumns = sql`id, title, start_date AS startDate, end_date AS endDate,
-  status, memo, updated_at AS updatedAt`;
+const tripColumns = {
+	endDate: trips.endDate,
+	id: trips.id,
+	memo: trips.memo,
+	startDate: trips.startDate,
+	status: trips.status,
+	title: trips.title,
+	updatedAt: trips.updatedAt,
+};
 
 const findTripRow = (
 	db: Db,
 	userId: UserId,
 	tripId: string,
 ): Promise<TripRow | undefined> =>
-	db.get<TripRow>(
-		sql`SELECT ${tripColumns} FROM trips WHERE id = ${tripId} AND user_id = ${userId}`,
-	);
+	db
+		.select(tripColumns)
+		.from(trips)
+		.where(and(eq(trips.id, tripId), eq(trips.userId, userId)))
+		.get();
 
 /** 期間に合わせて日を作る文 (旅程の作成・期間の変更で共用) */
-const insertDays = (
-	db: Db,
-	tripId: string,
-	dates: string[],
-	condition = sql`1 = 1`,
-): D1PreparedStatement[] =>
-	dates.map((date) =>
-		stmt(
-			db,
-			sql`INSERT INTO days (id, trip_id, date) SELECT ${ulid()}, ${tripId}, ${date} WHERE ${condition}`,
-		),
-	);
+const insertDays = (db: Db, tripId: string, dates: string[]) =>
+	dates.map((date) => db.insert(days).values({ date, id: ulid(), tripId }));
 
 /** 期間の変更で外れる日。地点が入った日は確認なしには消さない */
 const daysOutside = async (db: Db, tripId: string, dates: string[]) => {
-	const days = await db.all<{ date: string; id: string; stops: number }>(sql`
-    SELECT d.id, d.date, (SELECT count(*) FROM stops s WHERE s.day_id = d.id) AS stops
-    FROM days d WHERE d.trip_id = ${tripId}`);
+	const rows = await db
+		.select({ date: days.date, id: days.id, stops: count(stops.id) })
+		.from(days)
+		.leftJoin(stops, eq(stops.dayId, days.id))
+		.where(eq(days.tripId, tripId))
+		.groupBy(days.id);
 	const keep = new Set(dates);
 	return {
-		existing: new Set(days.map((d) => d.date)),
-		removed: days.filter((d) => !keep.has(d.date)),
+		existing: new Set(rows.map((d) => d.date)),
+		removed: rows.filter((d) => !keep.has(d.date)),
 	};
 };
 
@@ -66,25 +63,14 @@ const daysOutside = async (db: Db, tripId: string, dates: string[]) => {
  * 旅程をずらした (日数は同じまま開始日が変わった) ときは、日ごと動かす。1 日目は 1 日目のまま中身も付いていく。
  * UNIQUE(trip_id, date) に途中でぶつからないよう、一度仮の値にしてから新しい日付を入れる
  */
-const shiftDays = (
-	db: Db,
-	days: { id: string }[],
-	dates: string[],
-	lock: Lock,
-): D1PreparedStatement[] => [
-	...days.map((d) =>
-		stmt(
-			db,
-			sql`UPDATE days SET date = ${`shift:${d.id}`} WHERE id = ${d.id} AND ${guard(lock)}`,
-		),
-	),
-	...days.map((d, i) =>
-		stmt(
-			db,
-			sql`UPDATE days SET date = ${dates[i]} WHERE id = ${d.id} AND ${guard(lock)}`,
-		),
-	),
-];
+const shiftDays = (db: Db, current: { id: string }[], dates: string[]) => {
+	const setDate = (id: string, date: string) =>
+		db.update(days).set({ date }).where(eq(days.id, id));
+	return [
+		...current.map((d) => setDate(d.id, `shift:${d.id}`)),
+		...current.map((d, i) => setDate(d.id, dates[i] as string)),
+	];
+};
 
 /**
  * 期間の変更で日を合わせる文。
@@ -96,23 +82,23 @@ const periodStatements = async (
 	{
 		current,
 		dates,
-		lock,
 		removeDaysWithStops,
 	}: {
 		current: TripRow;
 		dates: string[];
-		lock: Lock;
 		removeDaysWithStops: boolean;
 	},
-): Promise<D1PreparedStatement[]> => {
-	const days = await db.all<{ date: string; id: string }>(
-		sql`SELECT id, date FROM days WHERE trip_id = ${lock.tripId} ORDER BY date`,
-	);
+): Promise<BatchItem<"sqlite">[]> => {
+	const currentDays = await db
+		.select({ date: days.date, id: days.id })
+		.from(days)
+		.where(eq(days.tripId, current.id))
+		.orderBy(asc(days.date));
 	const moved = current.startDate !== dates[0];
-	if (moved && days.length === dates.length) {
-		return shiftDays(db, days, dates, lock);
+	if (moved && currentDays.length === dates.length) {
+		return shiftDays(db, currentDays, dates);
 	}
-	const { existing, removed } = await daysOutside(db, lock.tripId, dates);
+	const { existing, removed } = await daysOutside(db, current.id, dates);
 	const withStops = removed.filter((d) => d.stops > 0);
 	if (withStops.length > 0 && !removeDaysWithStops) {
 		throw new HTTPException(CONFLICT, {
@@ -122,13 +108,10 @@ const periodStatements = async (
 	return [
 		...insertDays(
 			db,
-			lock.tripId,
+			current.id,
 			dates.filter((d) => !existing.has(d)),
-			guard(lock),
 		),
-		...removed.map((d) =>
-			stmt(db, sql`DELETE FROM days WHERE id = ${d.id} AND ${guard(lock)}`),
-		),
+		...removed.map((d) => db.delete(days).where(eq(days.id, d.id))),
 	];
 };
 
@@ -137,16 +120,31 @@ export const listTrips = async (
 	db: Db,
 	userId: UserId,
 ): Promise<TripSummary[]> => {
-	const trips = await db.all<Omit<TripSummary, "days">>(sql`
-    SELECT id, title, start_date AS startDate, end_date AS endDate, status, updated_at AS updatedAt
-    FROM trips WHERE user_id = ${userId}
-    ORDER BY start_date IS NULL, start_date DESC, created_at DESC`);
-	const days = await db.all<{ date: string; id: string; tripId: string }>(sql`
-    SELECT d.id, d.trip_id AS tripId, d.date FROM days d
-    JOIN trips t ON t.id = d.trip_id WHERE t.user_id = ${userId} ORDER BY d.date`);
-	return trips.map((t) => ({
+	const rows = await db
+		.select({
+			endDate: trips.endDate,
+			id: trips.id,
+			startDate: trips.startDate,
+			status: trips.status,
+			title: trips.title,
+			updatedAt: trips.updatedAt,
+		})
+		.from(trips)
+		.where(eq(trips.userId, userId))
+		.orderBy(
+			sql`${trips.startDate} IS NULL`,
+			desc(trips.startDate),
+			desc(trips.createdAt),
+		);
+	const dayRows = await db
+		.select({ date: days.date, id: days.id, tripId: days.tripId })
+		.from(days)
+		.innerJoin(trips, eq(trips.id, days.tripId))
+		.where(eq(trips.userId, userId))
+		.orderBy(asc(days.date));
+	return rows.map((t) => ({
 		...t,
-		days: days
+		days: dayRows
 			.filter((d) => d.tripId === t.id)
 			.map(({ date, id }) => ({ date, id })),
 	}));
@@ -189,14 +187,16 @@ export const createTrip = async (
 	if (body.startDate && body.endDate) {
 		dates.push(...datesBetween(body.startDate, body.endDate));
 	}
-	await db.$client.batch([
-		stmt(
-			db,
-			sql`
-      INSERT INTO trips (id, user_id, title, start_date, end_date, status, memo)
-      VALUES (${id}, ${userId}, ${body.title}, ${body.startDate ?? null}, ${body.endDate ?? null},
-        ${body.status ?? "planning"}, ${body.memo ?? null})`,
-		),
+	await db.batch([
+		db.insert(trips).values({
+			endDate: body.endDate ?? null,
+			id,
+			memo: body.memo ?? null,
+			startDate: body.startDate ?? null,
+			status: body.status ?? "planning",
+			title: body.title,
+			userId,
+		}),
 		...insertDays(db, id, dates),
 	]);
 	return getTripDetail(db, userId, id);
@@ -218,14 +218,17 @@ export const updateTrip = async (
 		throw new HTTPException(BAD_REQUEST, { message: problem });
 	}
 	const lock = { tripId, updatedAt: body.updatedAt, userId };
-	const statements: D1PreparedStatement[] = [
-		stmt(
-			db,
-			sql`
-      UPDATE trips SET title = ${next.title}, start_date = ${next.startDate}, end_date = ${next.endDate},
-        status = ${next.status}, memo = ${next.memo}
-      WHERE id = ${tripId} AND ${guard(lock)}`,
-		),
+	const statements: BatchItem<"sqlite">[] = [
+		db
+			.update(trips)
+			.set({
+				endDate: next.endDate,
+				memo: next.memo,
+				startDate: next.startDate,
+				status: next.status,
+				title: next.title,
+			})
+			.where(eq(trips.id, tripId)),
 	];
 	// 延期などで日付が無いときは、日はそのまま残す
 	if (next.startDate && next.endDate) {
@@ -233,7 +236,6 @@ export const updateTrip = async (
 			...(await periodStatements(db, {
 				current,
 				dates: datesBetween(next.startDate, next.endDate),
-				lock,
 				removeDaysWithStops: body.removeDaysWithStops ?? false,
 			})),
 		);
@@ -248,8 +250,15 @@ export const deleteTrip = async (
 	userId: UserId,
 	{ tripId, updatedAt }: { tripId: string; updatedAt: string },
 ): Promise<{ id: string }> => {
-	const result = await db.run(sql`
-    DELETE FROM trips WHERE id = ${tripId} AND user_id = ${userId} AND updated_at = ${updatedAt}`);
+	const result = await db
+		.delete(trips)
+		.where(
+			and(
+				eq(trips.id, tripId),
+				eq(trips.userId, userId),
+				eq(trips.updatedAt, updatedAt),
+			),
+		);
 	if (result.meta.changes > 0) {
 		return { id: tripId };
 	}

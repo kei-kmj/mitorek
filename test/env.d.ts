@@ -1,7 +1,8 @@
-import type { D1Migration } from "@cloudflare/vitest-pool-workers";
+/// <reference types="@cloudflare/vitest-pool-workers/types" />
 
-declare module "cloudflare:test" {
-	interface ProvidedEnv extends Env {
-		TEST_MIGRATIONS: D1Migration[];
+// vitest.config.mts が miniflare のバインディングとして渡す。テストのときだけ env に居る
+declare namespace Cloudflare {
+	interface Env {
+		TEST_MIGRATIONS: import("cloudflare:test").D1Migration[];
 	}
 }

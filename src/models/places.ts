@@ -1,6 +1,18 @@
-import { type SQL, sql } from "drizzle-orm";
+import {
+	and,
+	desc,
+	eq,
+	isNull,
+	or,
+	type SQL,
+	type SQLWrapper,
+	sql,
+} from "drizzle-orm";
 import { ulid } from "ulidx";
-import type { Db } from "../db/client";
+import { type Db, qb } from "../db/client";
+import { customPlaces } from "../db/schema/itinerary";
+import { prefectures, spots } from "../db/schema/master";
+import { lines, stationLines, stations } from "../db/schema/rail";
 import type { UserId } from "../env";
 import { IGNORED_CHARS, queryVariants } from "../lib/kana";
 import type { CustomPlaceBody, PlaceCandidate } from "../schemas/places";
@@ -26,39 +38,105 @@ const stationQuery = (q: string) => {
 };
 
 /** 列から、表記ゆれとして無視する文字 (長音・空白・中黒) を落とす式。lib/kana.ts の squash と同じ */
-const squashSql = (column: SQL): SQL =>
+const squashSql = (column: SQLWrapper): SQL =>
 	IGNORED_CHARS.reduce<SQL>(
 		(expr, c) => sql`replace(${expr}, ${c}, '')`,
-		column,
+		sql`${column}`,
 	);
 
 /**
  * 表記ゆれを吸収した部分一致: 検索語のカタカナ版・ひらがな版のどれかが、どれかの列に含まれる。
  * 空の列 (NULL) は一致しない
  */
-const matches = (columns: SQL[], q: string): SQL =>
-	sql`(${sql.join(
-		columns.flatMap((column) =>
+const matches = (columns: SQLWrapper[], q: string): SQL | undefined =>
+	or(
+		...columns.flatMap((column) =>
 			queryVariants(q).map(
 				(v) =>
 					sql`${squashSql(column)} LIKE ${likePattern(v, "%")} ESCAPE '\\'`,
 			),
 		),
-		sql` OR `,
-	)})`;
+	);
 
 /** 前方一致: 検索語の変形のどれかで始まる */
-const matchesPrefix = (column: SQL, q: string): SQL =>
-	sql.join(
-		queryVariants(q).map(
+const matchesPrefix = (column: SQLWrapper, q: string): SQL | undefined =>
+	or(
+		...queryVariants(q).map(
 			(v) => sql`${squashSql(column)} LIKE ${likePattern(v, "")} ESCAPE '\\'`,
 		),
-		sql` OR `,
 	);
 
 /** 前方一致を先に、短い名前を先に並べる式 (表記ゆれを吸収した形で比べる) */
-const rank = (column: SQL, q: string) =>
-	sql`(${matchesPrefix(column, q)}) DESC, length(${column})`;
+const rank = (column: SQLWrapper, q: string): SQL[] => [
+	desc(sql`(${matchesPrefix(column, q)})`),
+	sql`length(${column})`,
+];
+
+/** 駅を通る路線名を「・」でつないだもの */
+const stationLineNames = qb
+	.select({ names: sql`group_concat(${lines.name}, '・')` })
+	.from(stationLines)
+	.innerJoin(lines, eq(lines.id, stationLines.lineId))
+	.where(eq(stationLines.stationId, stations.id));
+
+const searchSpots = (db: Db, q: string) =>
+	db
+		.select({
+			collectionId: spots.collectionId,
+			detail: prefectures.name,
+			id: spots.id,
+			kind: sql<null>`NULL`,
+			lat: spots.lat,
+			lng: spots.lng,
+			name: spots.name,
+			type: sql<"spot">`'spot'`,
+		})
+		.from(spots)
+		.leftJoin(prefectures, eq(prefectures.code, spots.prefectureCode))
+		.where(
+			and(isNull(spots.retiredAt), matches([spots.name, spots.nameKana], q)),
+		)
+		.orderBy(...rank(spots.name, q))
+		.limit(LIMIT);
+
+const searchStations = (db: Db, q: string) =>
+	db
+		.select({
+			collectionId: sql<null>`NULL`,
+			detail: sql<
+				string | null
+			>`${prefectures.name} || COALESCE(' ' || (${stationLineNames}), '')`,
+			id: stations.id,
+			kind: sql<null>`NULL`,
+			lat: stations.lat,
+			lng: stations.lng,
+			name: stations.name,
+			type: sql<"station">`'station'`,
+		})
+		.from(stations)
+		.leftJoin(prefectures, eq(prefectures.code, stations.prefectureCode))
+		.where(matches([stations.name], stationQuery(q)))
+		.orderBy(...rank(stations.name, stationQuery(q)))
+		.limit(LIMIT);
+
+const searchMine = (db: Db, userId: UserId, q: string) =>
+	db
+		.select({
+			collectionId: sql<null>`NULL`,
+			detail: customPlaces.memo,
+			id: customPlaces.id,
+			kind: customPlaces.kind,
+			lat: customPlaces.lat,
+			lng: customPlaces.lng,
+			name: customPlaces.name,
+			type: sql<"custom">`'custom'`,
+		})
+		.from(customPlaces)
+		.where(
+			and(eq(customPlaces.userId, userId), matches([customPlaces.name], q)),
+		)
+		.orderBy(...rank(customPlaces.name, q))
+		.limit(LIMIT);
 
 /**
  * 名前で地点を探す: スポット (ふりがなでも)・駅・自分の登録地点。
@@ -69,28 +147,11 @@ export const searchPlaces = async (
 	db: Db,
 	userId: UserId,
 	q: string,
-): Promise<PlaceCandidate[]> => {
-	const spots = await db.all<PlaceCandidate>(sql`
-    SELECT 'spot' AS type, s.id, s.name, s.lat, s.lng, s.collection_id AS collectionId,
-      NULL AS kind, p.name AS detail
-    FROM spots s LEFT JOIN prefectures p ON p.code = s.prefecture_code
-    WHERE s.retired_at IS NULL
-      AND ${matches([sql`s.name`, sql`s.name_kana`], q)}
-    ORDER BY ${rank(sql`s.name`, q)} LIMIT ${LIMIT}`);
-	const stations = await db.all<PlaceCandidate>(sql`
-    SELECT 'station' AS type, st.id, st.name, st.lat, st.lng, NULL AS collectionId, NULL AS kind,
-      p.name || COALESCE(' ' || (SELECT group_concat(l.name, '・') FROM station_lines sl
-        JOIN lines l ON l.id = sl.line_id WHERE sl.station_id = st.id), '') AS detail
-    FROM stations st LEFT JOIN prefectures p ON p.code = st.prefecture_code
-    WHERE ${matches([sql`st.name`], stationQuery(q))}
-    ORDER BY ${rank(sql`st.name`, stationQuery(q))} LIMIT ${LIMIT}`);
-	const mine = await db.all<PlaceCandidate>(sql`
-    SELECT 'custom' AS type, id, name, lat, lng, NULL AS collectionId, kind, memo AS detail
-    FROM custom_places
-    WHERE user_id = ${userId} AND ${matches([sql`name`], q)}
-    ORDER BY ${rank(sql`name`, q)} LIMIT ${LIMIT}`);
-	return [...mine, ...spots, ...stations];
-};
+): Promise<PlaceCandidate[]> => [
+	...(await searchMine(db, userId, q)),
+	...(await searchSpots(db, q)),
+	...(await searchStations(db, q)),
+];
 
 /** 自分で使う地点 (ホテル・駐車場など) を登録する */
 export const createCustomPlace = async (
@@ -99,9 +160,15 @@ export const createCustomPlace = async (
 	body: CustomPlaceBody,
 ): Promise<PlaceCandidate> => {
 	const id = ulid();
-	await db.run(sql`
-    INSERT INTO custom_places (id, user_id, kind, name, lat, lng, memo)
-    VALUES (${id}, ${userId}, ${body.kind}, ${body.name}, ${body.lat}, ${body.lng}, ${body.memo ?? null})`);
+	await db.insert(customPlaces).values({
+		id,
+		kind: body.kind,
+		lat: body.lat,
+		lng: body.lng,
+		memo: body.memo ?? null,
+		name: body.name,
+		userId,
+	});
 	return {
 		collectionId: null,
 		detail: body.memo ?? null,
@@ -118,9 +185,9 @@ export const createCustomPlace = async (
 export const prefectureNames = async (
 	db: Db,
 ): Promise<(code: string) => string | undefined> => {
-	const rows = await db.all<{ code: string; name: string }>(
-		sql`SELECT code, name FROM prefectures`,
-	);
+	const rows = await db
+		.select({ code: prefectures.code, name: prefectures.name })
+		.from(prefectures);
 	const names = new Map(rows.map((r) => [r.code, r.name]));
 	return (code) => names.get(code);
 };

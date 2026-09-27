@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/d1";
+import { QueryBuilder } from "drizzle-orm/sqlite-core";
 import {
 	customPlaces,
 	days,
@@ -56,3 +57,6 @@ export const schema = {
 export const createDb = (d1: D1Database) => drizzle(d1, { schema });
 
 export type Db = ReturnType<typeof createDb>;
+
+/** 副問い合わせ (EXISTS など) を db なしで組み立てる。式を返す関数の中で使う */
+export const qb = new QueryBuilder();

@@ -11,13 +11,15 @@
 
 ```bash
 npm run dev          # http://localhost:8787 (ローカル D1 / R2)
-npx vitest --run     # 14 ファイル・69 テスト (すべて通る)
+npx vitest --run     # 25 ファイル・219 テスト (すべて通る)。test/ は src/ と同じ構成
 npm run lint         # biome。指摘 0
 ```
 
 - API 仕様: `/api/docs` (Swagger UI)、`/api/openapi.json`
 - 型チェックは `typescript` が devDependencies に無いので `npx -p typescript@5 tsc --noEmit -p .` で回す。
-  `test/` の `cloudflare:test` の型エラーは以前から残っている (未対応)
+  エラー 0 (`test/env.d.ts` の `/// <reference types="@cloudflare/vitest-pool-workers/types" />` で
+  `cloudflare:test` が解決できるようになった)
+- テストの `env` は `cloudflare:workers` から取る。`cloudflare:test` の `env` は deprecated
 
 ## 実装済み
 
@@ -125,10 +127,10 @@ design.md F8: better-auth + Google。`users.id` は自前の ULID のまま、�
 - **施設名検索が弱い** (design.md 未決事項 5): OSM は正式名称・網羅とも弱い。住所で探して名前を書き換えれば当面は足りる。次の候補は Google (地図ごと移行が必要) か楽天トラベル
 - **ヘッダーの説明文**「非公式・個人用の旅程ツール」の扱いが未決
 - **重複の共通化は保留** (ユーザー判断待ち。スキル mitorek-hono-route の「2 回目で知らせる」):
-  `keyed()` (trip-render / trip-leg / trip-search)、`ask()` (trip / photos / map-visits)、
-  テストの準備データ (spots / stations / trip-helpers)
+  `keyed()` (trip-render / trip-leg / trip-search)、`ask()` (trip / photos / map-visits)。
+  テストの準備データは `test/fixtures.ts` にまとめた (2026-09-27)
 - **スキルとのずれ**: `lib/route.ts` を雛形から拡張した (型の直し、400 の形、`bodyFormat: "form"`、`binary`)。
-  駅・コレクションなど共有マスタのモデルは `userId` を取らない。スキルの references は未更新
+  駅・コレクションなど共有マスタのモデルは `userId` を取らない。`references/lib-route.ts` は未更新 (models-spots / lib-geo-sql は 2026-09-27 に更新)
 
 ## データと環境の状態
 
@@ -137,7 +139,7 @@ design.md F8: better-auth + Google。`users.id` は自前の ULID のまま、�
 - **ローカル D1** にユーザーの手入力データがある (おでかけプラン「関西とり尽くす」、訪問、自分の地点)。
   消す前に `npm run db:export`。最新の退避は `data/mitorek-data.sql`
 - **マイグレーション**: `0001_*.sql` (trips.status に completed を足す作り直し) は**ローカルだけ適用済み、リモート未適用**。
-  子の表を退避して戻す形に手で直してある。生成されたままだと days / stops / legs / links が消える (CLAUDE.md、`test/migrations.test.ts`)
+  子の表を退避して戻す形に手で直してある。生成されたままだと days / stops / legs / links が消える (CLAUDE.md、`test/db/migrations.test.ts`)
 - **スポットのふりがな**: `seeds/0012_spot_kana.sql` (Sudachi で自動生成) → `seeds/0013_spot_kana_fix.sql` (手直し 11 件) の順に流す。
   生成は `scripts/spot_kana.py`、手直しは `data/spot_kana_review.tsv` を直して `scripts/spot_kana_fix.py`。
   いずれも git 管理外 (手元だけ)。まものランドのアイコンは 🦄 (`1f984`) に変更済み (seeds・退避データも)

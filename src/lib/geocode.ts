@@ -70,10 +70,7 @@ const prefectureOf = (
 		return address.province;
 	}
 	const code = address?.["ISO3166-2-lvl4"];
-	if (code === undefined) {
-		return undefined;
-	}
-	return prefectureName(code);
+	return code === undefined ? undefined : prefectureName(code);
 };
 
 /**
@@ -121,18 +118,6 @@ const placeName = (p: NominatimPlace): string => {
 	return name;
 };
 
-/** 片方が落ちても、もう片方の候補は返す。両方無いより役に立つため */
-const candidatesOrLogged = (
-	settled: PromiseSettledResult<GeocodeResult[]>,
-): GeocodeResult[] => {
-	if (settled.status === "fulfilled") {
-		return settled.value;
-	}
-	// biome-ignore lint/suspicious/noConsole: 失敗は Workers のログにだけ残す
-	console.error(settled.reason);
-	return [];
-};
-
 export const parseGsi = (features: GsiFeature[]): GeocodeResult[] =>
 	features.slice(0, MAX_RESULTS).map((f) => ({
 		detail: null,
@@ -154,6 +139,18 @@ export const parseNominatim = (
 		name: placeName(p),
 		source: "osm",
 	}));
+
+/** 片方が落ちても、もう片方の候補は返す。両方無いより役に立つため */
+const candidatesOrLogged = (
+	settled: PromiseSettledResult<GeocodeResult[]>,
+): GeocodeResult[] => {
+	if (settled.status === "fulfilled") {
+		return settled.value;
+	}
+	// biome-ignore lint/suspicious/noConsole: 失敗は Workers のログにだけ残す
+	console.error(settled.reason);
+	return [];
+};
 
 /** 住所 (国土地理院) と施設名 (Nominatim) を同時に探し、施設名の候補を先に並べる */
 export const geocode = async (

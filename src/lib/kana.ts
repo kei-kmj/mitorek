@@ -8,7 +8,7 @@ const HIRAGANA = /[ぁ-ゖ]/gu;
 const KATAKANA = /[ァ-ヶ]/gu;
 
 /** SQL 側 (models/places.ts の squashSql) が replace で落とす文字。ここが唯一の出どころ */
-const IGNORED_CHARS = ["ー", " ", "　", "・"] as const;
+export const IGNORED_CHARS = ["ー", " ", "　", "・"] as const;
 
 const IGNORED = new RegExp(`[${IGNORED_CHARS.join("")}\\s]`, "gu");
 
@@ -33,5 +33,3 @@ export const queryVariants = (q: string): string[] => {
 		(v) => v.length > 0,
 	);
 };
-
-export { IGNORED_CHARS };

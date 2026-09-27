@@ -1,9 +1,11 @@
-import { sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { ulid } from "ulidx";
-import type { Db } from "../db/client";
+import { type Db, qb } from "../db/client";
+import { days, stops } from "../db/schema/itinerary";
+import { spots } from "../db/schema/master";
+import { visits } from "../db/schema/visits";
 import type { UserId } from "../env";
 import type { ReviewItem } from "../schemas/review";
-import type { Visit } from "../schemas/visits";
 import { imagesOfVisits } from "./images";
 import { assertOwnTrip } from "./trip-lock";
 
@@ -11,11 +13,8 @@ import { assertOwnTrip } from "./trip-lock";
  * 訪問の日 (日本時間の暦日)。振り返りの日付だけのもの (YYYY-MM-DD) はそのまま、
  * 地図の「行った」の UTC 日時は +9 時間して日付にする
  */
-const visitDay = sql`CASE WHEN length(v.visited_at) = 10 THEN v.visited_at
-  ELSE date(v.visited_at, '+9 hours') END`;
-
-type ItemRow = Omit<ReviewItem, "visits">;
-type VisitRow = Omit<Visit, "images"> & { day: string };
+const visitDay = sql<string>`CASE WHEN length(${visits.visitedAt}) = 10 THEN ${visits.visitedAt}
+  ELSE date(${visits.visitedAt}, '+9 hours') END`;
 
 /** おでかけプランのスポットの立ち寄りと、その日に記録済みの訪問 (写真付き) */
 export const listReview = async (
@@ -24,26 +23,45 @@ export const listReview = async (
 	tripId: string,
 ): Promise<ReviewItem[]> => {
 	await assertOwnTrip(db, userId, tripId);
-	const items = await db.all<ItemRow>(sql`
-    SELECT st.id AS stopId, d.date, sp.id AS spotId, sp.name, sp.collection_id AS collectionId
-    FROM stops st JOIN days d ON d.id = st.day_id JOIN spots sp ON sp.id = st.spot_id
-    WHERE d.trip_id = ${tripId}
-    ORDER BY d.date, st.seq`);
-	const visits = await db.all<VisitRow>(sql`
-    SELECT v.id, v.spot_id AS spotId, v.visited_at AS visitedAt, v.lat, v.lng, v.memo,
-      v.created_at AS createdAt, ${visitDay} AS day
-    FROM visits v
-    WHERE v.user_id = ${userId}
-      AND v.spot_id IN (SELECT st.spot_id FROM stops st JOIN days d ON d.id = st.day_id
-        WHERE d.trip_id = ${tripId} AND st.spot_id IS NOT NULL)
-    ORDER BY v.visited_at`);
+	const items = await db
+		.select({
+			collectionId: spots.collectionId,
+			date: days.date,
+			name: spots.name,
+			spotId: spots.id,
+			stopId: stops.id,
+		})
+		.from(stops)
+		.innerJoin(days, eq(days.id, stops.dayId))
+		.innerJoin(spots, eq(spots.id, stops.spotId))
+		.where(eq(days.tripId, tripId))
+		.orderBy(asc(days.date), asc(stops.seq));
+	const tripSpotIds = qb
+		.select({ spotId: stops.spotId })
+		.from(stops)
+		.innerJoin(days, eq(days.id, stops.dayId))
+		.where(and(eq(days.tripId, tripId), isNotNull(stops.spotId)));
+	const tripVisits = await db
+		.select({
+			createdAt: visits.createdAt,
+			day: visitDay,
+			id: visits.id,
+			lat: visits.lat,
+			lng: visits.lng,
+			memo: visits.memo,
+			spotId: visits.spotId,
+			visitedAt: visits.visitedAt,
+		})
+		.from(visits)
+		.where(and(eq(visits.userId, userId), inArray(visits.spotId, tripSpotIds)))
+		.orderBy(asc(visits.visitedAt));
 	const images = await imagesOfVisits(
 		db,
-		visits.map((v) => v.id),
+		tripVisits.map((v) => v.id),
 	);
 	return items.map((item) => ({
 		...item,
-		visits: visits
+		visits: tripVisits
 			.filter((v) => v.spotId === item.spotId && v.day === item.date)
 			.map(({ day: _day, ...v }) => ({ ...v, images: images.get(v.id) ?? [] })),
 	}));
@@ -65,16 +83,14 @@ export const confirmReview = async (
 	const unique = [
 		...new Map(pending.map((i) => [`${i.spotId}@${i.date}`, i])).values(),
 	];
-	if (unique.length > 0) {
-		await db.$client.batch(
-			unique.map((i) =>
-				db.$client
-					.prepare(
-						"INSERT INTO visits (id, user_id, spot_id, visited_at) VALUES (?, ?, ?, ?)",
-					)
-					.bind(ulid(), userId, i.spotId, i.date),
-			),
-		);
+	// 1 文にまとめると D1 のバインド数の上限 (100) にかかるので、1 件 1 文で batch にする
+	const [first, ...rest] = unique.map((i) =>
+		db
+			.insert(visits)
+			.values({ id: ulid(), spotId: i.spotId, userId, visitedAt: i.date }),
+	);
+	if (first) {
+		await db.batch([first, ...rest]);
 	}
 	return listReview(db, userId, tripId);
 };

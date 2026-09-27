@@ -1,4 +1,5 @@
-import { applyD1Migrations, env, reset } from "cloudflare:test";
+import { applyD1Migrations, reset } from "cloudflare:test";
+import { env } from "cloudflare:workers";
 import { beforeEach } from "vitest";
 
 // 各テストを空の D1 から始める。reset() は全バインディングのデータを消すので、
